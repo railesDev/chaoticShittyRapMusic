@@ -1,0 +1,15 @@
+[build]
+  base = "web"
+  publish = "web/dist"
+  command = "npm ci && npm run build"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://YOUR_BACKEND_HOSTING_DOMAIN/api/:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
