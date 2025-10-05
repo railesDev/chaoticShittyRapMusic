@@ -104,32 +104,7 @@ async function getNumericChatId(): Promise<number> {
   return chat.id as number
 }
 
-async function computeNextCounter(): Promise<number> {
-  // Try to read last cu-N from recent updates for this bot in this channel
-  const chatIdNum = await getNumericChatId()
-  const fd = new FormData()
-  fd.append('limit', '100')
-  fd.append('timeout', '0')
-  fd.append('allowed_updates', JSON.stringify(['channel_post', 'edited_channel_post']))
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`
-  const r = await fetch(url, { method: 'POST', body: fd })
-  let last = 0
-  try {
-    const j = await r.json()
-    if (j.ok && Array.isArray(j.result)) {
-      for (let i = j.result.length - 1; i >= 0; i--) {
-        const u = j.result[i]
-        const msg = (u.channel_post || u.edited_channel_post)
-        if (msg && msg.chat && msg.chat.id === chatIdNum) {
-          const text = (msg.caption || msg.text || '') as string
-          const m = text.match(/\bcu-(\d+)\b/i)
-          if (m) { last = Math.max(last, parseInt(m[1], 10)); if (last) break }
-        }
-      }
-    }
-  } catch {}
-  return last + 1 || 1
-}
+// Removed getUpdates scan for simplicity/reliability. We compute strictly from description.
 
 async function getChatInfo(): Promise<any> {
   const fd = new FormData()
@@ -301,16 +276,13 @@ const handler: Handler = async (event) => {
   }
 
   const captionBase = sanitize(text)
-  // Determine counter: try updates, else channel description
-  let cuNumber = await computeNextCounter()
-  if (!cuNumber || cuNumber < 1) {
-    try {
-      const chat = await getChatInfo()
-      const fromDesc = extractCounterFromDesc(chat?.description)
-      cuNumber = (fromDesc || 0) + 1
-      if (!cuNumber) cuNumber = 1
-    } catch {}
-  }
+  // Determine counter from description right before sending
+  let cuNumber = 1
+  try {
+    const chat = await getChatInfo()
+    const fromDesc = extractCounterFromDesc(chat?.description)
+    cuNumber = (fromDesc || 0) + 1
+  } catch {}
   const finalPrefix = `cu-${cuNumber}`
 
   try {
