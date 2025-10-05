@@ -2,6 +2,7 @@ import type { Handler } from '@netlify/functions'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
+const PREVIEW_CHAT_ID = process.env.PREVIEW_CHAT_ID || ''
 
 function sanitize(text: string) {
   return (text || '')
@@ -28,7 +29,43 @@ const handler: Handler = async (event) => {
     if (!m) return { statusCode: 400, body: 'bad id' }
     const msgId = parseInt(m[1], 10)
     
-    // Try to find text via recent updates (channel_post / edited_channel_post)
+    // Preferred robust path: forward the message to a private preview chat and read its content
+    if (PREVIEW_CHAT_ID) {
+      try {
+        const fwd = new FormData()
+        fwd.append('chat_id', PREVIEW_CHAT_ID)
+        fwd.append('from_chat_id', TELEGRAM_CHANNEL_ID)
+        fwd.append('message_id', String(msgId))
+        fwd.append('disable_notification', 'true')
+        const forwarded = await tgApi('forwardMessage', fwd)
+
+        let text = forwarded?.caption || forwarded?.text || ''
+        let kind = ''
+        if (forwarded?.photo) kind = 'Фото'
+        else if (forwarded?.audio) kind = 'Аудио'
+        else if (forwarded?.voice) kind = 'Голосовое'
+        else if (forwarded?.document) kind = 'Документ'
+        else if (forwarded?.sticker) kind = 'Стикер'
+        else if (forwarded?.video) kind = 'Видео'
+        if (text) text = text.replace(/^\s*cu-\d+\s*\n?\n?/i, '')
+        let preview = text
+        if (kind) preview = `${kind}${preview ? `\n${preview}` : ''}`
+
+        // cleanup forwarded message
+        try {
+          const del = new FormData()
+          del.append('chat_id', PREVIEW_CHAT_ID)
+          del.append('message_id', String(forwarded?.message_id))
+          await tgApi('deleteMessage', del)
+        } catch {}
+
+        if (preview) {
+          return { statusCode: 200, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: true, id: msgId, text: sanitize(preview).slice(0,200) }) }
+        }
+      } catch {}
+    }
+
+    // Fallback: recent updates (may miss older messages)
     const fd = new FormData()
     fd.append('limit', '100')
     fd.append('timeout', '0')
@@ -53,12 +90,10 @@ const handler: Handler = async (event) => {
         }
       }
     }
-    // Strip leading cu-<id>
     if (text) text = text.replace(/^\s*cu-\d+\s*\n?\n?/i, '')
     let preview = text
     if (kind) preview = `${kind}${preview ? `\n${preview}` : ''}`
     if (!preview) return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: false }) }
-
     return { statusCode: 200, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: true, id: msgId, text: sanitize(preview).slice(0,200) }) }
   } catch (e: any) {
     return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: false }) }
