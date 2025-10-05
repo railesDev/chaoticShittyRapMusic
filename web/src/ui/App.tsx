@@ -87,8 +87,17 @@ export default function App() {
       return
     }
     let tokenToSend = captchaToken
-    if (captchaMode !== 'none' && !tokenToSend && (window as any).turnstile) {
-      try { tokenToSend = (window as any).turnstile.getResponse(widgetIdRef.current) || '' } catch {}
+    if (captchaMode !== 'none' && (window as any).turnstile) {
+      const ts = (window as any).turnstile
+      // Always refresh to avoid timeout-or-duplicate
+      try { ts.reset(widgetIdRef.current) } catch {}
+      // wait for a fresh token
+      const start = Date.now()
+      tokenToSend = ''
+      while (!tokenToSend && Date.now() - start < 4000) {
+        await new Promise(r => setTimeout(r, 150))
+        try { tokenToSend = ts.getResponse(widgetIdRef.current) || '' } catch {}
+      }
     }
     if (captchaMode !== 'none' && !tokenToSend) { setError('Подтвердите капчу'); return }
     setState('submitting')

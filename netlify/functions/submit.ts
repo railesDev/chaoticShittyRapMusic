@@ -139,6 +139,8 @@ async function getChatInfo(): Promise<any> {
 
 function extractCounterFromDesc(desc: string | undefined): number {
   if (!desc) return 0
+  const mRu = desc.match(/Всего\s+сообщений:\s*(\d+)/i)
+  if (mRu) return parseInt(mRu[1], 10)
   const m1 = desc.match(/\bcu-\s*(\d+)\b/i)
   if (m1) return parseInt(m1[1], 10)
   const m2 = desc.match(/\bcu:\s*(\d+)\b/i)
@@ -148,14 +150,19 @@ function extractCounterFromDesc(desc: string | undefined): number {
 
 function upsertCounterInDesc(desc: string | undefined, n: number): string {
   let base = (desc || '').trim()
-  if (!base) return `cu: ${n}`
+  const target = `Всего сообщений: ${n}`
+  if (!base) return target
+  if (/Всего\s+сообщений:\s*\d+/i.test(base)) {
+    return base.replace(/Всего\s+сообщений:\s*\d+/i, target)
+  }
+  // Fallback legacy tags -> replace with RU form
   if (/\bcu:\s*\d+\b/i.test(base)) {
-    return base.replace(/\bcu:\s*\d+\b/i, `cu: ${n}`)
+    return base.replace(/\bcu:\s*\d+\b/i, target)
   }
   if (/\bcu-\s*\d+\b/i.test(base)) {
-    return base.replace(/\bcu-\s*\d+\b/i, `cu: ${n}`)
+    return base.replace(/\bcu-\s*\d+\b/i, target)
   }
-  const suffix = ` • cu: ${n}`
+  const suffix = ` • ${target}`
   const limit = 255
   if (base.length + suffix.length > limit) {
     base = base.slice(0, limit - suffix.length - 1).trimEnd()
