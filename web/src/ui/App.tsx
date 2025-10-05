@@ -233,7 +233,7 @@ export default function App() {
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
   // Align items vertically centered inside the pill so placeholder sits on one line with icons
-  const composerBoxBase: React.CSSProperties = { display: 'flex', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '0 10px 2px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset', alignItems: 'center' }
+  const composerBoxBase: React.CSSProperties = { display: 'flex', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '0 10px 6px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset', alignItems: 'flex-end', minHeight: 44 }
   const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
@@ -377,34 +377,27 @@ export default function App() {
             <button type="button" onClick={onPickFile} title="Вложение" style={iconBtnPlain}>
               <Paperclip size={22} />
             </button>
-            <textarea
-              className="composer-textarea"
-              ref={taRef}
-              value={text}
-              onChange={(e)=>{
-                setText(e.target.value)
-                const t=e.target as HTMLTextAreaElement
-                t.style.height = 'auto'
-                const SINGLE = 40
-                const MAX = 140
-                const sc = Math.min(MAX, Math.max(SINGLE, t.scrollHeight))
-                t.style.height = sc + 'px'
-                // Центрируем текст по вертикали: одинаковые паддинги сверху/снизу
-                const line = 20
-                const pad = Math.max(0, Math.floor((sc - line) / 2))
-                setPadTop(pad)
+            <div
+              className="composer-editable"
+              ref={taRef as any}
+              contentEditable
+              role="textbox"
+              aria-multiline="true"
+              data-placeholder="Поделись тем, что важно"
+              onInput={(e)=>{
+                const v = (e.currentTarget as HTMLDivElement).innerText
+                setText(v)
               }}
-              placeholder="Поделись тем, что важно"
-              rows={1}
               style={{
-                ...textareaStyle,
                 flex: 1,
-                height: 40,
-                borderRadius: 28,
+                minHeight: 20,
                 lineHeight: '20px',
-                paddingTop: padTop,
-                paddingBottom: padTop,
-                alignSelf: 'center'
+                padding: '0 14px 6px',
+                outline: 'none',
+                background: 'transparent',
+                color: 'var(--text)',
+                borderRadius: 28,
+                whiteSpace: 'pre-wrap'
               }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>

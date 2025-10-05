@@ -34,6 +34,7 @@
       input, textarea, button { font-family: inherit; font-size: inherit; }
       #reply-input::placeholder { color: var(--muted); opacity: 1; }
       .composer-textarea::placeholder { color: var(--muted); opacity: .9; }
+      .composer-editable[contenteditable="true"]:empty:before { content: attr(data-placeholder); color: var(--muted); }
       #reply-input::placeholder { color: var(--muted); opacity: 1; }
       .composer-textarea::placeholder { color: var(--muted); opacity: .9; }
       .no-scrollbar { scrollbar-width: none; }
