@@ -161,7 +161,7 @@ export default function App() {
       if (!res.ok) {
         if (res.status === 429) {
           setErrorTip('Слишком часто, попробуй позже')
-          setTimeout(() => setErrorTip(''), 1800)
+          setTimeout(() => setErrorTip(''), 2000)
         }
         const txt = await res.text().catch(() => '')
         let j: any = null
@@ -173,7 +173,11 @@ export default function App() {
         }
         if (j?.error === 'reply_not_found') {
           setErrorTip('Сообщение для ответа не найдено')
-          setTimeout(() => setErrorTip(''), 1800)
+          setTimeout(() => setErrorTip(''), 2000)
+        }
+        if (!j) {
+          setErrorTip('Ошибка, попробуй позже')
+          setTimeout(() => setErrorTip(''), 2000)
         }
         throw new Error(j ? JSON.stringify(j) : (txt || 'Ошибка отправки'))
       }
@@ -218,7 +222,7 @@ export default function App() {
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
   // Align items vertically centered inside the pill so placeholder sits on one line with icons
-  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'flex-end', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '2px 10px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'flex-end', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '0 10px 2px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
   const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
@@ -369,15 +373,15 @@ export default function App() {
                 setText(e.target.value)
                 const t=e.target as HTMLTextAreaElement
                 if (e.target.value.length>0) {
-                  t.style.height='40px'
+                  t.style.height='36px'
                   t.style.height=Math.min(120, t.scrollHeight)+"px"
                 } else {
-                  t.style.height='40px'
+                  t.style.height='36px'
                 }
               }}
               placeholder="Поделись тем, что важно"
               rows={2}
-              style={{...textareaStyle, flex: 1, height: 40, borderRadius: 28, lineHeight: '18px', paddingTop: 2, paddingBottom: 6 }}
+              style={{...textareaStyle, flex: 1, height: 36, borderRadius: 28, lineHeight: '18px', paddingTop: 0, paddingBottom: 4, alignSelf: 'flex-end' }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
