@@ -196,10 +196,10 @@ export default function App() {
 
   // Styles
   const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px' }
-  const headerWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)', padding: '20px 0 12px' }
+  const headerWrap: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20, background: 'var(--bg)', padding: '20px 0 12px' }
   const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
-  const contentWrap: React.CSSProperties = { paddingTop: 8, paddingBottom: 180, height: 'calc(100vh - 220px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any }
+  const contentWrap: React.CSSProperties = { paddingTop: 76, paddingBottom: 180, height: 'calc(100dvh - 256px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
   const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
@@ -274,7 +274,6 @@ export default function App() {
     <div style={container}>
       <div style={headerWrap}>
         <div style={chip}>CU Pulse</div>
-        <h1 style={title}>Новый анонимный пост</h1>
         <p style={subtitle}>Используй с умом</p>
       </div>
 
