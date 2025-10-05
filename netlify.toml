@@ -1,11 +1,18 @@
 [build]
-  base = "web"
+  base = "."
   publish = "web/dist"
-  command = "npm ci && npm run build"
+  command = "npm ci && npm run build:web"
+  functions = "netlify/functions"
 
 [[redirects]]
-  from = "/api/*"
-  to = "https://YOUR_BACKEND_HOSTING_DOMAIN/api/:splat"
+  from = "/api/submit"
+  to = "/.netlify/functions/submit"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/config"
+  to = "/.netlify/functions/config"
   status = 200
   force = true
 

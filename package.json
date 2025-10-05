@@ -1,0 +1,14 @@
+{
+  "name": "pulsecu-root",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:web": "cd web && npm ci && npm run build"
+  },
+  "dependencies": {
+    "lambda-multipart-parser": "^1.0.1",
+    "file-type": "^18.7.0"
+  }
+}
+
