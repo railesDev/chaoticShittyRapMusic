@@ -38,6 +38,8 @@ export default function App() {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const hpRef = useRef<HTMLInputElement | null>(null)
   const [text, setText] = useState('')
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const [taCompact, setTaCompact] = useState(true)
   const [captchaMode, setCaptchaMode] = useState<'turnstile' | 'hcaptcha' | 'none'>('turnstile')
   const widgetIdRef = useRef<any>(null)
   // Captcha token lifecycle
@@ -128,6 +130,8 @@ export default function App() {
       tokenToSend = await requireCaptchaToken()
     } catch (err: any) {
       setError(err?.message || 'Подтвердите капчу')
+      setErrorTip('Подтвердите капчу')
+      setTimeout(() => setErrorTip(''), 2000)
       return
     }
     setState('submitting')
@@ -207,7 +211,7 @@ export default function App() {
   }, [state])
 
   // Styles
-  const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px' }
+  const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', height: '100svh', overflow: 'hidden', position: 'relative' }
   const HEADER_H = 56
   const FOOTER_SPACE = 180
   const headerWrap: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, height: HEADER_H, zIndex: 20, background: 'var(--bg)', display: 'flex', alignItems: 'center' }
@@ -368,20 +372,23 @@ export default function App() {
             </button>
             <textarea
               className="composer-textarea"
+              ref={taRef}
               value={text}
               onChange={(e)=>{
                 setText(e.target.value)
                 const t=e.target as HTMLTextAreaElement
                 if (e.target.value.length>0) {
-                  t.style.height='36px'
-                  t.style.height=Math.min(120, t.scrollHeight)+"px"
+                  setTaCompact(false)
+                  t.style.height='40px'
+                  t.style.height=Math.min(140, t.scrollHeight)+"px"
                 } else {
-                  t.style.height='36px'
+                  setTaCompact(true)
+                  t.style.height='40px'
                 }
               }}
               placeholder="Поделись тем, что важно"
               rows={2}
-              style={{...textareaStyle, flex: 1, height: 36, borderRadius: 28, lineHeight: '18px', paddingTop: 0, paddingBottom: 4, alignSelf: 'flex-end' }}
+              style={{...textareaStyle, flex: 1, height: 40, borderRadius: 28, lineHeight: taCompact ? '40px' : '20px', paddingTop: taCompact ? 0 : 4, paddingBottom: taCompact ? 0 : 6, alignSelf: 'flex-end' }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
