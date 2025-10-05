@@ -118,18 +118,16 @@ export default function App() {
         credentials: 'include'
       })
       if (!res.ok) {
-        try {
-          const j = await res.json()
-          if (j?.error === 'captcha_failed') {
-            if ((window as any).turnstile && widgetIdRef.current) {
-              try { (window as any).turnstile.reset(widgetIdRef.current) } catch {}
-            }
-            throw new Error('Капча истекла, попробуйте ещё раз')
+        const txt = await res.text().catch(() => '')
+        let j: any = null
+        try { j = txt ? JSON.parse(txt) : null } catch {}
+        if (j?.error === 'captcha_failed') {
+          if ((window as any).turnstile && widgetIdRef.current) {
+            try { (window as any).turnstile.reset(widgetIdRef.current) } catch {}
           }
-          throw new Error(JSON.stringify(j))
-        } catch {
-          throw new Error(await res.text())
+          throw new Error('Капча истекла, попробуйте ещё раз')
         }
+        throw new Error(j ? JSON.stringify(j) : (txt || 'Ошибка отправки'))
       }
       setState('done')
     } catch (e: any) {
