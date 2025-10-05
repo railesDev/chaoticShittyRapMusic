@@ -197,16 +197,16 @@ export default function App() {
   const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px' }
   const headerWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)', padding: '20px 0 12px' }
   const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
-  const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18, fontWeight: 500 }
+  const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
   const contentWrap: React.CSSProperties = { paddingTop: 8, paddingBottom: 180, minHeight: 'calc(100vh - 180px)' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
   const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column' }
-  const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }
-  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 18, resize: 'none' }
+  const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
+  const textareaStyle: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
-  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '10px 14px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
-  const roundIconBtn: React.CSSProperties = { width: 56, height: 56, borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '6px 10px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 260px', padding: '10px 14px', borderRadius: 16, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 20 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -334,16 +334,16 @@ export default function App() {
             <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
             </div>
             {replyInput && (
-            <div style={{ marginTop: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
-                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.45 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
-            </div>
+              <div style={{ marginTop: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+              </div>
             )}
           </div>
 
         <form onSubmit={handleSubmit} style={composerInner}>
           <div style={composerBox}>
-            <button type="button" onClick={onPickFile} title="Вложение" style={{ ...roundIconBtn }}>
-              <Paperclip size={24} />
+            <button type="button" onClick={onPickFile} title="Вложение" style={iconBtnPlain}>
+              <Paperclip size={22} />
             </button>
             <textarea
               className="composer-textarea"
@@ -362,13 +362,13 @@ export default function App() {
               rows={2}
               style={{...textareaStyle, flex: 1, height: 56, borderRadius: 28 }}
             />
-            <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={{ ...roundIconBtn }}>
+            <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
-                <span style={{ width: 18, height: 18, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <span style={{ width: 16, height: 16, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               ) : sendState==='success' ? (
-                <Check size={24} />
+                <Check size={22} />
               ) : (
-                <Send size={24} />
+                <Send size={22} />
               )}
             </button>
           </div>
