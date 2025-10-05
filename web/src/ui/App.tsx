@@ -34,6 +34,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [captchaToken, setCaptchaToken] = useState<string>('')
   const [siteKey, setSiteKey] = useState<string>('')
+  const [rateLimitSec, setRateLimitSec] = useState<number>(10)
   const [fields] = useState(buildFields)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const hpRef = useRef<HTMLInputElement | null>(null)
@@ -47,6 +48,10 @@ export default function App() {
   const lastUsedTokenVersionRef = useRef(-1)
   const waitResolveRef = useRef<((t: string) => void) | null>(null)
   const waitTimerRef = useRef<number | null>(null)
+  // UI gating: captcha refresh + cooldown
+  const [isCaptchaRefreshing, setIsCaptchaRefreshing] = useState<boolean>(true)
+  const [isCooldown, setIsCooldown] = useState<boolean>(false)
+  const [statusTip, setStatusTip] = useState<string>('')
 
   const reset = useCallback(() => {
     setState('idle'); setError(null); setCaptchaToken(''); setText('')
@@ -63,6 +68,8 @@ export default function App() {
       callback: (token: string) => {
         setCaptchaToken(token)
         tokenVersionRef.current += 1
+        setIsCaptchaRefreshing(false)
+        if (statusTip) setStatusTip('')
         if (waitResolveRef.current) {
           waitResolveRef.current(token)
           waitResolveRef.current = null
@@ -75,7 +82,7 @@ export default function App() {
       'error-callback': () => setCaptchaToken('')
     })
     widgetIdRef.current = id
-  }, [siteKey])
+  }, [siteKey, statusTip])
 
   React.useEffect(() => {
     // fetch runtime config for captcha site key
@@ -86,9 +93,13 @@ export default function App() {
           const j = await res.json()
           if (j?.turnstile_site_key) setSiteKey(j.turnstile_site_key)
           if (j?.captcha) setCaptchaMode(j.captcha)
+          if (Number.isFinite(j?.rate_limit_seconds)) setRateLimitSec(parseInt(j.rate_limit_seconds, 10))
         }
       } catch {}
     })()
+    // show status while captcha is being prepared (on first load)
+    setIsCaptchaRefreshing(true)
+    setStatusTip('Обновляю капчу')
     const id = setInterval(() => {
       if (window.turnstile) {
         clearInterval(id)
@@ -243,7 +254,24 @@ export default function App() {
       setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
       setState('done')
       setSendState('success')
-      setTimeout(() => setSendState('idle'), 1500)
+      // After the checkmark, start background captcha refresh and cooldown
+      setTimeout(() => {
+        setSendState('idle')
+        // Start captcha refresh (if captcha is enabled)
+        if (captchaMode !== 'none') {
+          setIsCaptchaRefreshing(true)
+          setStatusTip('Обновляю капчу')
+          try { window.turnstile?.reset(widgetIdRef.current) } catch {}
+        } else {
+          setIsCaptchaRefreshing(false)
+          setStatusTip('')
+        }
+        // Start cooldown timer
+        if (rateLimitSec > 0) {
+          setIsCooldown(true)
+          window.setTimeout(() => setIsCooldown(false), rateLimitSec * 1000)
+        }
+      }, 1500)
     } catch (e: any) {
       setError(e?.message || 'Ошибка отправки')
       setErrorTip('Попробуй позже')
@@ -483,8 +511,10 @@ export default function App() {
                 touchAction: 'pan-y'
               }}
             />
-            <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
+            <button aria-label="Отправить" disabled={state==='submitting' || isCaptchaRefreshing || isCooldown} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
+                <span style={{ width: 16, height: 16, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              ) : (isCaptchaRefreshing || isCooldown) ? (
                 <span style={{ width: 16, height: 16, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               ) : sendState==='success' ? (
                 <Check size={22} />
@@ -497,9 +527,12 @@ export default function App() {
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
-          {/* Floating error tooltip */}
+          {/* Floating tips */}
           {errorTip && (
             <div style={{ position:'absolute', right: 14, bottom: 58, zIndex: 50, background: 'rgba(244,63,94,0.97)', color:'#fff', padding:'6px 10px', borderRadius: 8, fontSize: 12, boxShadow:'0 6px 16px rgba(0,0,0,0.35)' }}>{errorTip}</div>
+          )}
+          {statusTip && (
+            <div style={{ position:'absolute', right: 14, bottom: 58, zIndex: 45, background: 'rgba(255,255,255,0.10)', color:'var(--muted)', padding:'6px 10px', borderRadius: 8, fontSize: 12, boxShadow:'0 6px 16px rgba(0,0,0,0.20)' }}>{statusTip}</div>
           )}
         </form>
       </div>
