@@ -40,6 +40,7 @@ export default function App() {
   const [text, setText] = useState('')
   const taRef = useRef<HTMLTextAreaElement | null>(null)
   const [taCompact, setTaCompact] = useState(true)
+  const [taPadTop, setTaPadTop] = useState(14) // baseline calc: height - lineHeight(20) - padBottom(6)
   const [captchaMode, setCaptchaMode] = useState<'turnstile' | 'hcaptcha' | 'none'>('turnstile')
   const widgetIdRef = useRef<any>(null)
   // Captcha token lifecycle
@@ -384,18 +385,16 @@ export default function App() {
               onChange={(e)=>{
                 setText(e.target.value)
                 const t=e.target as HTMLTextAreaElement
-                if (e.target.value.length>0) {
-                  setTaCompact(false)
-                  t.style.height='40px'
-                  t.style.height=Math.min(140, t.scrollHeight)+"px"
-                } else {
-                  setTaCompact(true)
-                  t.style.height='40px'
-                }
+                const growing = e.target.value.length>0
+                setTaCompact(!growing)
+                t.style.height='40px'
+                t.style.height=Math.min(140, t.scrollHeight)+"px"
+                const h = parseFloat(getComputedStyle(t).height)
+                setTaPadTop(Math.max(0, h - 20 - 6))
               }}
               placeholder="Поделись тем, что важно"
               rows={2}
-              style={{...textareaStyle, flex: 1, height: 40, borderRadius: 28, lineHeight: taCompact ? '40px' : '20px', paddingTop: taCompact ? 0 : 4, paddingBottom: taCompact ? 0 : 6, alignSelf: 'flex-end' }}
+              style={{...textareaStyle, flex: 1, height: 40, borderRadius: 28, lineHeight: taCompact ? '40px' : '20px', paddingTop: taCompact ? 0 : taPadTop, paddingBottom: 6, alignSelf: 'flex-end' }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
