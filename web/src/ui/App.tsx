@@ -121,6 +121,13 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    // Require either text or attachment
+    const hasFile = !!(fileRef.current?.files && fileRef.current.files[0])
+    if (!hasFile && !text.trim()) {
+      setErrorTip('Добавь текст или вложение')
+      setTimeout(() => setErrorTip(''), 2000)
+      return
+    }
     if (hpRef.current?.value) {
       setError('Ошибка валидации')
       return
@@ -220,7 +227,7 @@ export default function App() {
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
   const contentWrap: React.CSSProperties = { position: 'fixed', top: HEADER_H, left: 0, right: 0, bottom: FOOTER_SPACE, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any, padding: '8px 16px' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
-  const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column' }
+  const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column', position: 'relative' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
