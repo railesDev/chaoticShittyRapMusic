@@ -2,6 +2,7 @@ import type { Handler } from '@netlify/functions'
 import multipart from 'lambda-multipart-parser'
 import crypto from 'node:crypto'
 import { fileTypeFromBuffer } from 'file-type'
+import OpenAI from 'openai'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
@@ -11,6 +12,7 @@ const DEBUG = process.env.DEBUG === '1'
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET || ''
 const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET || ''
 const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6', 10)
+const OPENAI_KEY = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY || ''
 const RATE_LIMIT_MINUTES = parseInt(process.env.RATE_LIMIT_MINUTES || '1', 10)
 const RATE_LIMIT_SECONDS_ENV = parseInt(process.env.RATE_LIMIT_SECONDS || '10', 10)
 const RATE_WINDOW_SECONDS = Number.isFinite(RATE_LIMIT_SECONDS_ENV) ? RATE_LIMIT_SECONDS_ENV : (RATE_LIMIT_MINUTES * 60)
@@ -78,13 +80,44 @@ async function verifyCaptcha(token: string | undefined): Promise<CaptchaResult> 
 }
 
 function basicModeration(text: string) {
-  const t = (text || '').toLowerCase()
+  const t = (text || '')
   if (t.length > 4000) return 'Слишком длинный текст (>4000)'
-  const bad = ['суицид', 'бомба', 'террор', 'насилие', 'экстремизм']
-  if (bad.some(w => t.includes(w))) return 'Сообщение содержит запрещённые слова'
-  const links = (t.match(/https?:\/\//g) || []).length + (t.match(/www\./g) || []).length
-  if (links > 2) return 'Слишком много ссылок в сообщении'
   return null
+}
+
+type ImageForModeration = { mime: string; data: Buffer }
+
+async function aiModerate(inputText: string | undefined, image?: ImageForModeration): Promise<{ flagged: boolean; details?: any }> {
+  if (!OPENAI_KEY) return { flagged: false }
+  try {
+    const client = new OpenAI({ apiKey: OPENAI_KEY })
+
+    const inputs: any[] = []
+    const text = (inputText || '').trim()
+    if (text) {
+      inputs.push({ type: 'input_text', text })
+    }
+    if (image && image.mime.startsWith('image/')) {
+      const dataUrl = `data:${image.mime};base64,${image.data.toString('base64')}`
+      inputs.push({ type: 'input_image', image_url: { url: dataUrl } })
+    }
+
+    if (inputs.length === 0) return { flagged: false }
+
+    // Prefer the Moderations API if possible
+    const res: any = await client.moderations.create({
+      model: 'omni-moderation-latest',
+      input: inputs.length === 1 && typeof inputs[0] === 'string' ? inputs[0] : inputs as any
+    })
+
+    // Combine flags across results
+    const results: any[] = Array.isArray(res?.results) ? res.results : []
+    const flagged = results.some(r => r.flagged)
+    return { flagged, details: results }
+  } catch (e: any) {
+    if (DEBUG) console.warn('AI moderation error:', e?.message || e)
+    return { flagged: false }
+  }
 }
 
 async function tgApi(method: string, form?: FormData) {
@@ -264,6 +297,11 @@ const handler: Handler = async (event) => {
   const captionBase = sanitize(text)
   // No storage/description counter — we only use message_id
 
+  // AI moderation: flag text/images
+  const modImage = (mime && content && mime.startsWith('image/')) ? { mime, data: content } as ImageForModeration : undefined
+  const moderation = await aiModerate(text, modImage)
+  const isFlagged = !!moderation.flagged
+
   try {
     if (content) {
       const fd = new FormData()
@@ -272,10 +310,13 @@ const handler: Handler = async (event) => {
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
+        if (isFlagged) fd.append('has_spoiler', 'true')
         fd.append('photo', new Blob([content], { type: mime }), filename || 'image')
         const sent = await tgApi('sendPhoto', fd)
         const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
+        const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('audio/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
@@ -285,7 +326,9 @@ const handler: Handler = async (event) => {
         fd.append('audio', new Blob([content], { type: mime }), filename || 'audio')
         const sent = await tgApi('sendAudio', fd)
         const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
+        const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('video/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
@@ -295,7 +338,9 @@ const handler: Handler = async (event) => {
         fd.append('video', new Blob([content], { type: mime }), filename || 'video')
         const sent = await tgApi('sendVideo', fd)
         const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
+        const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
@@ -305,7 +350,9 @@ const handler: Handler = async (event) => {
         fd.append('document', new Blob([content], { type: mime || 'application/octet-stream' }), filename || 'file')
         const sent = await tgApi('sendDocument', fd)
         const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
+        const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       }
     } else {
@@ -316,7 +363,9 @@ const handler: Handler = async (event) => {
       if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
       const sent = await tgApi('sendMessage', fd)
       const id = sent.message_id as number
-      const finalText = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+      const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+      const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
+      const finalText = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
       await editText(TELEGRAM_CHANNEL_ID, id, finalText)
     }
 

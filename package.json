@@ -7,6 +7,7 @@
     "build:web": "cd web && npm install && npm run build"
   },
   "dependencies": {
+    "openai": "^4.57.0",
     "lambda-multipart-parser": "^1.0.1",
     "file-type": "^18.7.0"
   }
