@@ -98,18 +98,27 @@ const handler: Handler = async (event) => {
     return { statusCode: 500, body: 'Server not configured' }
   }
 
-  let parsed
+  let parsed: any
   try {
     parsed = await multipart.parse(event)
   } catch (e: any) {
     return { statusCode: 400, body: 'Bad form' }
   }
+  // Ensure safe shapes
+  if (!parsed || typeof parsed !== 'object') parsed = { fields: {}, files: [] }
+  if (!parsed.fields) parsed.fields = {}
+  if (!parsed.files) parsed.files = []
 
   // decode obfuscated fields mapping
   let fieldsMap: Record<string, string> = {}
   try {
-    fieldsMap = JSON.parse(Buffer.from(parsed?.fields?.m || '', 'base64').toString('utf8'))
-  } catch {}
+    const mRaw = parsed.fields?.m
+    if (typeof mRaw === 'string' && mRaw) {
+      fieldsMap = JSON.parse(Buffer.from(mRaw, 'base64').toString('utf8'))
+    }
+  } catch (e) {
+    if (DEBUG) console.warn('Failed to decode fields map:', String(e))
+  }
 
   function getField(name: string) {
     const key = fieldsMap[name]
@@ -126,8 +135,8 @@ const handler: Handler = async (event) => {
     return parsed.fields[name]
   }
 
-  const token = getField('token')
-  const text = (getField('text') || '').trim()
+  const token = getField('token') as string | undefined
+  const text = String(getField('text') || '').trim()
   const honeypot = getField('honeypot')
 
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
