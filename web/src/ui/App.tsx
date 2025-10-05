@@ -52,6 +52,31 @@ export default function App() {
   const [isCaptchaRefreshing, setIsCaptchaRefreshing] = useState<boolean>(true)
   const [isCooldown, setIsCooldown] = useState<boolean>(false)
   const [statusTip, setStatusTip] = useState<string>('')
+  const refreshRetryTimerRef = useRef<number | null>(null)
+
+  const triggerCaptchaRefresh = useCallback((delay = 0) => {
+    if (captchaMode === 'none') {
+      setIsCaptchaRefreshing(false)
+      setStatusTip('')
+      return
+    }
+    const run = () => {
+      try {
+        setIsCaptchaRefreshing(true)
+        setStatusTip('Обновляю капчу')
+        const ts: any = (window as any).turnstile
+        if (ts) {
+          try { ts.reset(widgetIdRef.current) } catch {}
+          try { ts.execute && ts.execute(widgetIdRef.current) } catch {}
+        }
+      } catch {}
+    }
+    if (delay > 0) {
+      window.setTimeout(run, delay)
+    } else {
+      run()
+    }
+  }, [captchaMode])
 
   const reset = useCallback(() => {
     setState('idle'); setError(null); setCaptchaToken(''); setText('')
@@ -79,10 +104,20 @@ export default function App() {
           }
         }
       },
-      'error-callback': () => setCaptchaToken('')
+      'error-callback': () => {
+        setCaptchaToken('')
+        // Retry after a short delay
+        if (refreshRetryTimerRef.current) {
+          window.clearTimeout(refreshRetryTimerRef.current)
+          refreshRetryTimerRef.current = null
+        }
+        refreshRetryTimerRef.current = window.setTimeout(() => triggerCaptchaRefresh(0), 1500)
+      }
     })
     widgetIdRef.current = id
-  }, [siteKey, statusTip])
+    // Immediately trigger a token fetch after render
+    triggerCaptchaRefresh(0)
+  }, [siteKey, statusTip, triggerCaptchaRefresh])
 
   React.useEffect(() => {
     // fetch runtime config for captcha site key
@@ -92,7 +127,13 @@ export default function App() {
         if (res.ok) {
           const j = await res.json()
           if (j?.turnstile_site_key) setSiteKey(j.turnstile_site_key)
-          if (j?.captcha) setCaptchaMode(j.captcha)
+          if (j?.captcha) {
+            setCaptchaMode(j.captcha)
+            if (j.captcha === 'none') {
+              setIsCaptchaRefreshing(false)
+              setStatusTip('')
+            }
+          }
           if (Number.isFinite(j?.rate_limit_seconds)) setRateLimitSec(parseInt(j.rate_limit_seconds, 10))
         }
       } catch {}
@@ -258,14 +299,7 @@ export default function App() {
       setTimeout(() => {
         setSendState('idle')
         // Start captcha refresh (if captcha is enabled)
-        if (captchaMode !== 'none') {
-          setIsCaptchaRefreshing(true)
-          setStatusTip('Обновляю капчу')
-          try { window.turnstile?.reset(widgetIdRef.current) } catch {}
-        } else {
-          setIsCaptchaRefreshing(false)
-          setStatusTip('')
-        }
+        triggerCaptchaRefresh(0)
         // Start cooldown timer
         if (rateLimitSec > 0) {
           setIsCooldown(true)
