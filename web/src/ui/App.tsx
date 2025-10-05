@@ -183,16 +183,20 @@ export default function App() {
   }, [state])
 
   // Styles
-  const container: React.CSSProperties = { maxWidth: 800, margin: '48px auto', padding: 24 }
-  const title: React.CSSProperties = { fontSize: 44, fontWeight: 500, margin: '0 0 8px', letterSpacing: -0.5 }
+  const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px' }
+  const headerWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)', padding: '20px 0 12px' }
+  const title: React.CSSProperties = { fontSize: 40, fontWeight: 500, margin: '8px 0 6px', letterSpacing: -0.5 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18, fontWeight: 500 }
-  const card: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginTop: 24 }
+  const contentWrap: React.CSSProperties = { paddingTop: 8, paddingBottom: 120, minHeight: 'calc(100vh - 180px)' }
+  const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
+  const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 10, alignItems: 'flex-end' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }
-  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
+  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 16, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
-  const primaryBtn: React.CSSProperties = { padding: '12px 18px', borderRadius: 999, border: '1px solid var(--accent)', background: 'var(--accent)', color: '#0b0b0f', fontWeight: 500, letterSpacing: 0.2, cursor: 'pointer', boxShadow: '0 8px 28px rgba(113,195,203,0.35)', display: 'inline-flex', alignItems: 'center', gap: 8 }
+  const primaryBtn: React.CSSProperties = { padding: '12px 16px', borderRadius: 16, border: '1px solid var(--accent)', background: 'var(--bg)', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }
   const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }
-  const chip: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 500, display: 'inline-block' }
+  const attachBtn: React.CSSProperties = { padding: '10px 12px', borderRadius: 16, border: '1px solid var(--accent)', background: 'var(--bg)', color: 'var(--accent)', cursor: 'pointer' }
+  const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 500, display: 'inline-block' }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
@@ -204,11 +208,11 @@ export default function App() {
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) { setPreviewUrl(null); setPreviewKind(null); return }
+    if (f.type.startsWith('video/')) { alert('Видео не поддерживается'); if (fileRef.current) fileRef.current.value=''; return }
     const url = URL.createObjectURL(f)
     setPreviewUrl(url)
     if (f.type.startsWith('image/')) setPreviewKind('image')
     else if (f.type.startsWith('audio/')) setPreviewKind('audio')
-    else if (f.type.startsWith('video/')) setPreviewKind('video')
     else setPreviewKind('file')
   }, [])
   const clearFile = useCallback(() => {
@@ -234,61 +238,50 @@ export default function App() {
 
   return (
     <div style={container}>
-      <div>
+      <div style={headerWrap}>
         <div style={chip}>CU Pulse</div>
-        <h1 style={title}>Отправить сообщение</h1>
-        <p style={subtitle}>Поддерживаются любые вложения. Работает модерация.</p>
+        <h1 style={title}>Новый анонимный пост</h1>
+        <p style={subtitle}>Используй с умом</p>
       </div>
 
-      <div style={card}>
-        <form onSubmit={handleSubmit}>
-          <div style={label}>Ответить на сообщение (cu-XXX)</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-123" style={{ flex: '0 0 220px', padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
-            {!!replyPreview && <button type="button" onClick={()=>setReplyOpen(v=>!v)} style={{ ...ghostBtn, padding: '8px 12px' }}>{replyOpen ? 'Свернуть цитату' : 'Показать цитату'}</button>}
-            {replyInput && <button type="button" onClick={()=>{setReplyInput(''); setReplyPreview('')}} style={{ ...ghostBtn, borderColor: 'var(--border)', color: 'var(--muted)', padding: '8px 12px' }}>Очистить</button>}
+      <div style={contentWrap}>
+        <div style={{ marginTop: 12 }}>
+          <div style={label}>Ответить на</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
+            <CornerUpRight size={20} color={'var(--accent)'} />
+            <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={{ flex: '0 0 220px', padding: 10, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
           </div>
           {replyInput && (
             <div style={{ marginTop: 10, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
-              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>
-                {replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}
-              </div>
+              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
             </div>
           )}
-          <div style={label}>Сообщение</div>
-          <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder="Напишите, что важно…" rows={8} style={textareaStyle} />
 
-          <div style={{ height: 10 }} />
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-            <button type="button" onClick={onPickFile} title="Вложение" style={{...ghostBtn, padding: '10px', borderRadius: 12}}>📎</button>
-            <textarea value={text} onChange={(e)=>{setText(e.target.value); const t=e.target; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Напишите сообщение…" rows={3} style={{...textareaStyle, flex: 1, height: 56}} />
-            <button disabled={state==='submitting'} type="submit" style={primaryBtn}>
-              {state==='submitting' && <span style={{ width: 14, height: 14, border: '2px solid #0b0b0f', borderRightColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />}
-              {state === 'submitting' ? 'Отправка…' : state === 'done' ? 'Отправлено' : state === 'error' ? 'Повторить?' : 'Отправить'}
+        {previewUrl && (
+          <div style={{ marginTop: 16, position: 'relative' }}>
+            {previewKind === 'image' && <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 18, border: '1px solid var(--border)' }} />}
+            {previewKind === 'audio' && <audio controls src={previewUrl} style={{ width: '100%' }} />}
+            {previewKind === 'file' && <div style={{ color: 'var(--muted)' }}>Файл готов к отправке</div>}
+            <button type="button" onClick={clearFile} title="Удалить" style={{ position: 'absolute', right: 8, bottom: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 12, padding: 8, color: 'var(--accent)' }}>
+              <Trash2 size={18} />
             </button>
           </div>
+        )}
+        </div>
+      </div>
+
+      <div style={composerWrap}>
+        <form onSubmit={handleSubmit} style={composerInner}>
+          <button type="button" onClick={onPickFile} title="Вложение" style={attachBtn}><Paperclip size={20} /></button>
+          <textarea value={text} onChange={(e)=>{setText(e.target.value); const t=e.target as HTMLTextAreaElement; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Поделись тем, что важно" rows={2} style={{...textareaStyle, flex: 1, height: 56, borderRadius: 24 }} />
+          <button disabled={state==='submitting'} type="submit" style={primaryBtn}>
+            {state==='submitting' ? (<span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><span style={{ width: 14, height: 14, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Отправка…</span>) : (<><Send size={18} /> Отправить</>)}
+          </button>
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
-
-          {previewUrl && (
-            <div style={{ marginTop: 12 }}>
-              {previewKind === 'image' && <img src={previewUrl} alt="preview" style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid var(--border)' }} />}
-              {previewKind === 'audio' && <audio controls src={previewUrl} style={{ width: '100%' }} />}
-              {previewKind === 'video' && <video controls src={previewUrl} style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border)' }} />}
-              {previewKind === 'file' && <div style={{ color: 'var(--muted)' }}>Файл готов к отправке</div>}
-            </div>
-          )}
-
-          <div style={{ height: 16 }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
-
-          <div style={{ height: 12 }} />
-          <div style={row}>
-            {state === 'done' && <span style={{ color: 'var(--ok)', fontWeight: 500 }}>Готово! Скоро появится в канале.</span>}
-            {error && <span style={{ color: 'var(--error)' }}>{error}</span>}
-          </div>
-
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
         </form>
+        <div style={{ maxWidth: 900, margin: '6px auto 0', color: state==='done' ? 'var(--ok)' : state==='error' ? 'var(--error)' : 'transparent' }}>{state==='done' ? 'Готово! Скоро появится в канале.' : error || ''}</div>
       </div>
     </div>
   )

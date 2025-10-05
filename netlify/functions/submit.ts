@@ -296,6 +296,10 @@ const handler: Handler = async (event) => {
     if (mime && blocked.some(p => mime.startsWith(p))) {
       return { statusCode: 400, body: 'Этот тип файлов запрещён' }
     }
+    // Drop video support explicitly
+    if (mime && mime.startsWith('video/')) {
+      return { statusCode: 400, body: 'Видео не поддерживается' }
+    }
   }
 
   const captionBase = sanitize(text)
