@@ -117,6 +117,21 @@ export default function App() {
     })
   }
 
+  // Adjust layout for visual viewport (iOS keyboard etc.)
+  React.useEffect(() => {
+    const vv = (window as any).visualViewport
+    if (!vv) return
+    const update = () => {
+      const bottomInset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop))
+      document.documentElement.style.setProperty('--vv-top', `${vv.offsetTop || 0}px`)
+      document.documentElement.style.setProperty('--vv-bottom', `${bottomInset}px`)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
+
 
   // Prevent page scroll (especially on iOS when keyboard is open).
   // Allow vertical scroll only inside the composer editable box.
@@ -239,13 +254,13 @@ export default function App() {
   const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', height: '100dvh', overflow: 'hidden', position: 'relative' }
   const HEADER_H = 56
   const FOOTER_SPACE = 180
-  const headerWrap: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, height: HEADER_H, zIndex: 20, background: 'var(--bg)', display: 'flex', alignItems: 'center' }
+  const headerWrap: React.CSSProperties = { position: 'fixed', top: 'var(--vv-top, 0px)', left: 0, right: 0, height: HEADER_H, zIndex: 20, background: 'var(--bg)', display: 'flex', alignItems: 'center' }
   const headerRow: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10 }
   const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
   // Content area is not scrollable per requirement; only composer text may scroll
-  const contentWrap: React.CSSProperties = { position: 'fixed', top: HEADER_H, left: 0, right: 0, bottom: FOOTER_SPACE, overflow: 'hidden', padding: '8px 16px' }
-  const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
+  const contentWrap: React.CSSProperties = { position: 'fixed', top: `calc(var(--vv-top, 0px) + ${HEADER_H}px)`, left: 0, right: 0, bottom: `calc(${FOOTER_SPACE}px + var(--vv-bottom, 0px))`, overflow: 'hidden', padding: '8px 16px' }
+  const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 'var(--vv-bottom, 0px)', zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
   const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column', position: 'relative' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
