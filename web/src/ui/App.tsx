@@ -38,22 +38,24 @@ export default function App() {
   const hpRef = useRef<HTMLInputElement | null>(null)
   const [text, setText] = useState('')
   const [captchaMode, setCaptchaMode] = useState<'turnstile' | 'hcaptcha' | 'none'>('turnstile')
+  const widgetIdRef = useRef<any>(null)
 
   const reset = useCallback(() => {
     setState('idle'); setError(null); setCaptchaToken(''); setText('')
     if (fileRef.current) fileRef.current.value = ''
     if (window.turnstile) {
-      try { window.turnstile.reset() } catch {}
+      try { window.turnstile.reset(widgetIdRef.current) } catch {}
     }
   }, [])
 
   const onLoadTurnstile = useCallback(() => {
     if (!siteKey || !window.turnstile) return
-    window.turnstile.render('#cf-turnstile', {
+    const id = window.turnstile.render('#cf-turnstile', {
       sitekey: siteKey,
       callback: (token: string) => setCaptchaToken(token),
       'error-callback': () => setCaptchaToken('')
     })
+    widgetIdRef.current = id
   }, [siteKey])
 
   React.useEffect(() => {
@@ -84,20 +86,21 @@ export default function App() {
       setError('Ошибка валидации')
       return
     }
-    if (captchaMode !== 'none' && !captchaToken) {
-      setError('Подтвердите капчу')
-      return
+    let tokenToSend = captchaToken
+    if (captchaMode !== 'none' && !tokenToSend && (window as any).turnstile) {
+      try { tokenToSend = (window as any).turnstile.getResponse(widgetIdRef.current) || '' } catch {}
     }
+    if (captchaMode !== 'none' && !tokenToSend) { setError('Подтвердите капчу'); return }
     setState('submitting')
     try {
       const fd = new FormData()
       fd.set(fields.get('text')!, text)
-      fd.set(fields.get('token')!, captchaToken)
+      fd.set(fields.get('token')!, tokenToSend || '')
       fd.set(fields.get('honeypot')!, hpRef.current?.value || '')
       // Add non-obfuscated fallbacks to improve compatibility
-      if (captchaToken) {
-        fd.set('token', captchaToken)
-        fd.set('cf-turnstile-response', captchaToken)
+      if (tokenToSend) {
+        fd.set('token', tokenToSend)
+        fd.set('cf-turnstile-response', tokenToSend)
       }
       if (fileRef.current?.files?.[0]) fd.set(fields.get('file')!, fileRef.current.files[0])
 
