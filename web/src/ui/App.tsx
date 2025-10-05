@@ -133,6 +133,7 @@ export default function App() {
     }
     setState('submitting')
     setSendState('sending')
+    setSendState('sending')
     try {
       const fd = new FormData()
       fd.set(fields.get('text')!, text)
@@ -181,6 +182,8 @@ export default function App() {
       setTimeout(() => setSendState('idle'), 1500)
     } catch (e: any) {
       setError(e?.message || 'Ошибка отправки')
+      setErrorTip('Попробуй позже')
+      setTimeout(() => setErrorTip(''), 1800)
       setState('error')
       setSendState('idle')
     }
@@ -207,7 +210,7 @@ export default function App() {
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
   const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'flex-end', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '6px 10px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
   const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
-  const replyInputStyle: React.CSSProperties = { flex: '0 0 260px', padding: '10px 14px', borderRadius: 16, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 20 }
+  const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
@@ -218,6 +221,8 @@ export default function App() {
   const [replyInput, setReplyInput] = useState('')
   const [replyPreview, setReplyPreview] = useState<string>('')
   const [replyOpen, setReplyOpen] = useState(true)
+  const [sendState, setSendState] = useState<'idle'|'sending'|'success'>('idle')
+  const [errorTip, setErrorTip] = useState('')
 
   const onPickFile = useCallback(() => fileRef.current?.click(), [])
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -327,7 +332,8 @@ export default function App() {
       </div>
 
       <div style={composerWrap}>
-          <div style={{ maxWidth: 900, margin: '0 auto 8px' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
+          <div style={{ marginBottom: 8 }}>
             <div style={label}>Ответить на</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
             <Reply size={24} color={'var(--accent)'} />
@@ -375,8 +381,11 @@ export default function App() {
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
+          {/* Floating error tooltip */}
+          {errorTip && (
+            <div style={{ position:'absolute', right: 20, bottom: 74, background: 'rgba(244,63,94,0.95)', color:'#fff', padding:'6px 10px', borderRadius: 8, fontSize: 12, boxShadow:'0 6px 16px rgba(0,0,0,0.35)' }}>{errorTip}</div>
+          )}
         </form>
-        <div style={{ maxWidth: 900, margin: '6px auto 0', color: state==='done' ? 'var(--ok)' : state==='error' ? 'var(--error)' : 'transparent' }}>{state==='done' ? 'Готово! Скоро появится в канале.' : error || ''}</div>
       </div>
     </div>
   )

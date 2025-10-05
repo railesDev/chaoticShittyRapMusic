@@ -114,17 +114,7 @@ async function editCaption(chatId: string, messageId: number, caption: string) {
   return tgApi('editMessageCaption', fd)
 }
 
-async function getNumericChatId(): Promise<number> {
-  // If env already numeric, use it
-  const idStr = TELEGRAM_CHANNEL_ID.trim()
-  if (/^-?\d+$/.test(idStr)) return Number(idStr)
-  const fd = new FormData()
-  fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-  const chat = await tgApi('getChat', fd)
-  return chat.id as number
-}
-
-// Removed getUpdates scan for simplicity/reliability. We compute strictly from description.
+// Counter/description updates removed — numbering is via message_id only.
 
 async function getChatInfo(): Promise<any> {
   const fd = new FormData()
@@ -132,38 +122,7 @@ async function getChatInfo(): Promise<any> {
   return tgApi('getChat', fd)
 }
 
-function extractCounterFromDesc(desc: string | undefined): number {
-  if (!desc) return 0
-  const mRu = desc.match(/Всего\s+сообщений:\s*(\d+)/i)
-  if (mRu) return parseInt(mRu[1], 10)
-  const m1 = desc.match(/\bcu-\s*(\d+)\b/i)
-  if (m1) return parseInt(m1[1], 10)
-  const m2 = desc.match(/\bcu:\s*(\d+)\b/i)
-  if (m2) return parseInt(m2[1], 10)
-  return 0
-}
-
-function upsertCounterInDesc(desc: string | undefined, n: number): string {
-  let base = (desc || '').trim()
-  const target = `Всего сообщений: ${n}`
-  if (!base) return target
-  if (/Всего\s+сообщений:\s*\d+/i.test(base)) {
-    return base.replace(/Всего\s+сообщений:\s*\d+/i, target)
-  }
-  // Fallback legacy tags -> replace with RU form
-  if (/\bcu:\s*\d+\b/i.test(base)) {
-    return base.replace(/\bcu:\s*\d+\b/i, target)
-  }
-  if (/\bcu-\s*\d+\b/i.test(base)) {
-    return base.replace(/\bcu-\s*\d+\b/i, target)
-  }
-  const suffix = ` • ${target}`
-  const limit = 255
-  if (base.length + suffix.length > limit) {
-    base = base.slice(0, limit - suffix.length - 1).trimEnd()
-  }
-  return base + suffix
-}
+// No channel description parsing/updating anymore
 
 const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -303,18 +262,7 @@ const handler: Handler = async (event) => {
   }
 
   const captionBase = sanitize(text)
-  // Reserve counter for description in a private storage chat (optional)
-  let totalCounter = 0
-  try {
-    if (COUNTER_STORAGE_CHAT_ID) {
-      const fdReserve = new FormData()
-      fdReserve.append('chat_id', COUNTER_STORAGE_CHAT_ID)
-      fdReserve.append('text', `reserve ${Date.now()}`)
-      fdReserve.append('disable_notification', 'true')
-      const r = await tgApi('sendMessage', fdReserve)
-      totalCounter = r.message_id as number
-    }
-  } catch {}
+  // No storage/description counter — we only use message_id
 
   try {
     if (content) {
@@ -372,15 +320,7 @@ const handler: Handler = async (event) => {
       await editText(TELEGRAM_CHANNEL_ID, id, finalText)
     }
 
-    // Persist last counter in channel description (best-effort)
-    try {
-      const chat = await getChatInfo()
-      const newDesc = upsertCounterInDesc(chat?.description, totalCounter > 0 ? totalCounter : extractCounterFromDesc(chat?.description) + 1)
-      const fdDesc = new FormData()
-      fdDesc.append('chat_id', TELEGRAM_CHANNEL_ID)
-      fdDesc.append('description', newDesc)
-      await tgApi('setChatDescription', fdDesc)
-    } catch {}
+    // No channel description updates
   } catch (e: any) {
     const msg = String(e?.message || '')
     if (/reply message not found/i.test(msg) || /REPLY_MESSAGE_NOT_FOUND/i.test(msg)) {
