@@ -53,6 +53,8 @@ export default function App() {
   const [isCooldown, setIsCooldown] = useState<boolean>(false)
   const [statusTip, setStatusTip] = useState<string>('')
   const refreshRetryTimerRef = useRef<number | null>(null)
+  const widgetRenderedRef = useRef<boolean>(false)
+  const refreshingInFlightRef = useRef<boolean>(false)
 
   const triggerCaptchaRefresh = useCallback((delay = 0) => {
     if (captchaMode === 'none') {
@@ -62,13 +64,13 @@ export default function App() {
     }
     const run = () => {
       try {
+        if (refreshingInFlightRef.current) return
+        const ts: any = (window as any).turnstile
+        if (!ts || !widgetRenderedRef.current) return
+        refreshingInFlightRef.current = true
         setIsCaptchaRefreshing(true)
         setStatusTip('Обновляю капчу')
-        const ts: any = (window as any).turnstile
-        if (ts) {
-          try { ts.reset(widgetIdRef.current) } catch {}
-          try { ts.execute && ts.execute(widgetIdRef.current) } catch {}
-        }
+        try { ts.reset(widgetIdRef.current) } catch {}
       } catch {}
     }
     if (delay > 0) {
@@ -88,12 +90,14 @@ export default function App() {
 
   const onLoadTurnstile = useCallback(() => {
     if (!siteKey || !window.turnstile) return
+    if (widgetRenderedRef.current) return
     const id = window.turnstile.render('#cf-turnstile', {
       sitekey: siteKey,
       callback: (token: string) => {
         setCaptchaToken(token)
         tokenVersionRef.current += 1
         setIsCaptchaRefreshing(false)
+        refreshingInFlightRef.current = false
         if (statusTip) setStatusTip('')
         if (waitResolveRef.current) {
           waitResolveRef.current(token)
@@ -106,6 +110,7 @@ export default function App() {
       },
       'error-callback': () => {
         setCaptchaToken('')
+        refreshingInFlightRef.current = false
         // Retry after a short delay
         if (refreshRetryTimerRef.current) {
           window.clearTimeout(refreshRetryTimerRef.current)
@@ -115,9 +120,10 @@ export default function App() {
       }
     })
     widgetIdRef.current = id
+    widgetRenderedRef.current = true
     // Immediately trigger a token fetch after render
     triggerCaptchaRefresh(0)
-  }, [siteKey, statusTip, triggerCaptchaRefresh])
+  }, [siteKey, triggerCaptchaRefresh])
 
   React.useEffect(() => {
     // fetch runtime config for captcha site key
@@ -139,8 +145,10 @@ export default function App() {
       } catch {}
     })()
     // show status while captcha is being prepared (on first load)
-    setIsCaptchaRefreshing(true)
-    setStatusTip('Обновляю капчу')
+    if (captchaMode !== 'none') {
+      setIsCaptchaRefreshing(true)
+      setStatusTip('Обновляю капчу')
+    }
     const id = setInterval(() => {
       if (window.turnstile) {
         clearInterval(id)
