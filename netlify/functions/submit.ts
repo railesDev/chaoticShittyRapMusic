@@ -94,6 +94,24 @@ async function tgApi(method: string, form?: FormData) {
   return j.result
 }
 
+async function editText(chatId: string, messageId: number, text: string) {
+  const fd = new FormData()
+  fd.append('chat_id', chatId)
+  fd.append('message_id', String(messageId))
+  fd.append('text', text)
+  fd.append('parse_mode', 'HTML')
+  return tgApi('editMessageText', fd)
+}
+
+async function editCaption(chatId: string, messageId: number, caption: string) {
+  const fd = new FormData()
+  fd.append('chat_id', chatId)
+  fd.append('message_id', String(messageId))
+  fd.append('caption', caption)
+  fd.append('parse_mode', 'HTML')
+  return tgApi('editMessageCaption', fd)
+}
+
 const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
@@ -217,43 +235,57 @@ const handler: Handler = async (event) => {
     }
   }
 
-  const cu = generateCuId()
-  const caption = text ? `${cu}\n\n${sanitize(text)}` : cu
+  const captionBase = sanitize(text)
 
   try {
     if (content) {
       const fd = new FormData()
       if (mime?.startsWith('image/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', caption)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         fd.append('photo', new Blob([content], { type: mime }), filename || 'image')
-        await tgApi('sendPhoto', fd)
+        const sent = await tgApi('sendPhoto', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('audio/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', caption)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         fd.append('audio', new Blob([content], { type: mime }), filename || 'audio')
-        await tgApi('sendAudio', fd)
+        const sent = await tgApi('sendAudio', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('video/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', caption)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         fd.append('video', new Blob([content], { type: mime }), filename || 'video')
-        await tgApi('sendVideo', fd)
+        const sent = await tgApi('sendVideo', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', caption)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         fd.append('document', new Blob([content], { type: mime || 'application/octet-stream' }), filename || 'file')
-        await tgApi('sendDocument', fd)
+        const sent = await tgApi('sendDocument', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       }
     } else {
       const fd = new FormData()
       fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-      fd.append('text', caption)
+      fd.append('text', captionBase || '...')
       fd.append('parse_mode', 'HTML')
-      await tgApi('sendMessage', fd)
+      const sent = await tgApi('sendMessage', fd)
+      const id = sent.message_id as number
+      const finalText = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+      await editText(TELEGRAM_CHANNEL_ID, id, finalText)
     }
   } catch (e: any) {
     return { statusCode: 502, body: `Telegram error: ${e?.message || 'unknown'}` }

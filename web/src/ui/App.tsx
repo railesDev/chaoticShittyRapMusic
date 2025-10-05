@@ -123,35 +123,84 @@ export default function App() {
     }
   }
 
+  // Styles
+  const container: React.CSSProperties = { maxWidth: 800, margin: '48px auto', padding: 24 }
+  const title: React.CSSProperties = { fontSize: 44, fontWeight: 800, margin: '0 0 8px', letterSpacing: -0.5 }
+  const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18 }
+  const card: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginTop: 24 }
+  const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 600 }
+  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16 }
+  const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
+  const primaryBtn: React.CSSProperties = { padding: '12px 18px', borderRadius: 999, border: '1px solid var(--accent)', background: 'var(--accent)', color: '#0b0b0f', fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer', boxShadow: '0 6px 24px rgba(124,92,255,0.35)' }
+  const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }
+  const chip: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, background: 'rgba(124,92,255,0.15)', color: 'var(--accent-2)', fontWeight: 700, display: 'inline-block' }
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
+
+  const onPickFile = useCallback(() => fileRef.current?.click(), [])
+  const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) { setPreviewUrl(null); setPreviewKind(null); return }
+    const url = URL.createObjectURL(f)
+    setPreviewUrl(url)
+    if (f.type.startsWith('image/')) setPreviewKind('image')
+    else if (f.type.startsWith('audio/')) setPreviewKind('audio')
+    else if (f.type.startsWith('video/')) setPreviewKind('video')
+    else setPreviewKind('file')
+  }, [])
+  const clearFile = useCallback(() => {
+    if (fileRef.current) fileRef.current.value = ''
+    setPreviewUrl(null); setPreviewKind(null)
+  }, [])
+
   return (
-    <div style={{ maxWidth: 680, margin: '32px auto', padding: 16, fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ marginBottom: 8 }}>Анонимная отправка</h1>
-      <p style={{ color: '#555', marginTop: 0 }}>Текст + опциональное вложение (картинка, аудио, видео или файл). Включена автоматическая модерация на сервере.</p>
-      <form onSubmit={handleSubmit}>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Текст сообщения"
-          required
-          rows={6}
-          style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
-        />
-        <div style={{ height: 12 }} />
-        <input ref={fileRef} type="file" name="file" />
-        <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
-        <div style={{ height: 12 }} />
-        {captchaMode !== 'none' && (
-          <div id="cf-turnstile" data-sitekey={siteKey || ''}></div>
-        )}
-        <div style={{ height: 12 }} />
-        <button disabled={state==='submitting'} type="submit" style={{ padding: '10px 16px', borderRadius: 8, border: 0, background: '#0a84ff', color: '#fff', cursor: 'pointer' }}>
-          {state === 'submitting' ? 'Отправка…' : 'Отправить'}
-        </button>
-        {state === 'done' && <span style={{ marginLeft: 12, color: 'green' }}>Отправлено! Проверим и запостим.</span>}
-        {error && <div style={{ marginTop: 8, color: 'crimson' }}>{error}</div>}
-      </form>
-      <div style={{ marginTop: 24, fontSize: 13, color: '#666' }}>
-        <div>Антиспам: капча, хонипот, ограничение частоты, валидация типов/размеров.</div>
+    <div style={container}>
+      <div>
+        <div style={chip}>CU Pulse</div>
+        <h1 style={title}>Анонимная отправка</h1>
+        <p style={subtitle}>Текст + опциональное вложение (картинка, аудио, видео или файл). Включена автоматическая модерация на сервере.</p>
+      </div>
+
+      <div style={card}>
+        <form onSubmit={handleSubmit}>
+          <div style={label}>Сообщение</div>
+          <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder="Напишите, что важно…" rows={8} style={textareaStyle} />
+
+          <div style={{ height: 16 }} />
+          <div style={label}>Вложение (необязательно)</div>
+          <div style={row}>
+            <button type="button" onClick={onPickFile} style={ghostBtn}>Прикрепить файл</button>
+            {fileRef.current?.files?.[0] && (
+              <span style={{ color: 'var(--muted)' }}>{fileRef.current.files[0].name}</span>
+            )}
+            {fileRef.current?.files?.[0] && (
+              <button type="button" onClick={clearFile} style={{ ...ghostBtn, borderColor: 'var(--border)', color: 'var(--muted)' }}>Убрать</button>
+            )}
+          </div>
+          <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
+
+          {previewUrl && (
+            <div style={{ marginTop: 12 }}>
+              {previewKind === 'image' && <img src={previewUrl} alt="preview" style={{ maxWidth: '100%', borderRadius: 12, border: '1px solid var(--border)' }} />}
+              {previewKind === 'audio' && <audio controls src={previewUrl} style={{ width: '100%' }} />}
+              {previewKind === 'video' && <video controls src={previewUrl} style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border)' }} />}
+              {previewKind === 'file' && <div style={{ color: 'var(--muted)' }}>Файл готов к отправке</div>}
+            </div>
+          )}
+
+          <div style={{ height: 16 }} />
+          {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''}></div>}
+
+          <div style={{ height: 16 }} />
+          <div style={row}>
+            <button disabled={state==='submitting'} type="submit" style={primaryBtn}>{state==='submitting' ? 'Отправка…' : 'Отправить'}</button>
+            {state === 'done' && <span style={{ color: 'var(--ok)', fontWeight: 600 }}>Отправлено! Скоро появится в канале.</span>}
+            {error && <span style={{ color: 'var(--error)' }}>{error}</span>}
+          </div>
+
+          <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
+        </form>
       </div>
     </div>
   )
