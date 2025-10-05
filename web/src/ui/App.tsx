@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Paperclip, Send, Reply, Trash2, Pause, Play } from 'lucide-react'
+import { Paperclip, Send, Reply, Trash2, Pause, Play, Check } from 'lucide-react'
 
 type SubmitState = 'idle' | 'submitting' | 'done' | 'error'
 
@@ -115,6 +115,8 @@ export default function App() {
     })
   }
 
+  const [sendState, setSendState] = useState<'idle'|'sending'|'success'>('idle')
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -130,6 +132,7 @@ export default function App() {
       return
     }
     setState('submitting')
+    setSendState('sending')
     try {
       const fd = new FormData()
       fd.set(fields.get('text')!, text)
@@ -169,10 +172,17 @@ export default function App() {
       }
       // mark token as used to force refresh next submit
       lastUsedTokenVersionRef.current = tokenVersionRef.current
+      // reset inputs on success
+      setText('')
+      if (fileRef.current) fileRef.current.value = ''
+      setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
       setState('done')
+      setSendState('success')
+      setTimeout(() => setSendState('idle'), 1500)
     } catch (e: any) {
       setError(e?.message || 'Ошибка отправки')
       setState('error')
+      setSendState('idle')
     }
   }
 
@@ -195,8 +205,8 @@ export default function App() {
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 18, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
-  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '8px 12px 8px 12px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
-  const roundIconBtn: React.CSSProperties = { width: 44, height: 44, borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
+  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '10px 14px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  const roundIconBtn: React.CSSProperties = { width: 56, height: 56, borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 260px', padding: '10px 14px', borderRadius: 16, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 20 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -324,20 +334,42 @@ export default function App() {
             <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
             </div>
             {replyInput && (
-              <div style={{ marginTop: 8, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
-                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
-              </div>
+            <div style={{ marginTop: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 18, lineHeight: 1.45 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+            </div>
             )}
           </div>
 
         <form onSubmit={handleSubmit} style={composerInner}>
           <div style={composerBox}>
-            <button type="button" onClick={onPickFile} title="Вложение" style={{ ...roundIconBtn, width: 42, height: 42 }}>
-              <Paperclip size={20} />
+            <button type="button" onClick={onPickFile} title="Вложение" style={{ ...roundIconBtn }}>
+              <Paperclip size={24} />
             </button>
-            <textarea className="composer-textarea" value={text} onChange={(e)=>{setText(e.target.value); const t=e.target as HTMLTextAreaElement; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Поделись тем, что важно" rows={2} style={{...textareaStyle, flex: 1, height: 52}} />
-            <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={{ ...roundIconBtn, width: 48, height: 48 }}>
-              {state==='submitting' ? (<span style={{ width: 18, height: 18, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />) : (<Send size={22} />)}
+            <textarea
+              className="composer-textarea"
+              value={text}
+              onChange={(e)=>{
+                setText(e.target.value)
+                const t=e.target as HTMLTextAreaElement
+                if (e.target.value.length>0) {
+                  t.style.height='56px'
+                  t.style.height=Math.min(160, t.scrollHeight)+"px"
+                } else {
+                  t.style.height='56px'
+                }
+              }}
+              placeholder="Поделись тем, что важно"
+              rows={2}
+              style={{...textareaStyle, flex: 1, height: 56, borderRadius: 28 }}
+            />
+            <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={{ ...roundIconBtn }}>
+              {state==='submitting' ? (
+                <span style={{ width: 18, height: 18, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              ) : sendState==='success' ? (
+                <Check size={24} />
+              ) : (
+                <Send size={24} />
+              )}
             </button>
           </div>
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
