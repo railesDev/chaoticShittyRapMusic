@@ -206,7 +206,8 @@ export default function App() {
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
-  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'flex-end', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '6px 10px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  // Align items vertically centered inside the pill so placeholder sits on one line with icons
+  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '6px 10px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
   const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
@@ -364,7 +365,7 @@ export default function App() {
               }}
               placeholder="Поделись тем, что важно"
               rows={2}
-              style={{...textareaStyle, flex: 1, height: 56, borderRadius: 28 }}
+              style={{...textareaStyle, flex: 1, height: 56, borderRadius: 28, lineHeight: '24px', paddingTop: 16, paddingBottom: 16 }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
