@@ -4,6 +4,9 @@
   command = "npm ci && npm run build:web"
   functions = "netlify/functions"
 
+[functions]
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/api/submit"
   to = "/.netlify/functions/submit"
