@@ -26,6 +26,14 @@ Simple, production‑ready anonymous submission channel hosted 100% on Netlify:
    - Optional: `MAX_ATTACHMENT_SIZE_MB` (default 6), `RATE_LIMIT_MINUTES` (default 1)
 4) Deploy and test on your Netlify domain.
 
+### Branch previews on Netlify + GitHub
+- Create a feature branch, e.g. `feature/ui-redesign` and push it to GitHub.
+- In Netlify Site settings → Build & deploy → Deploy contexts, enable:
+  - Branch deploys for your feature branch (or all non‑production branches)
+  - Deploy previews for pull requests
+- Open a PR from `feature/ui-redesign` to `main`. Netlify will attach a unique Preview URL to the PR for QA.
+- When approved, merge the PR; Netlify promotes the change to your production context at the next deploy.
+
 ### Enable Turnstile after domain exists
 - Create Turnstile widget, add `<yoursite>.netlify.app` as hostname (and `localhost` for local dev)
 - Put keys in Site env: `CAPTCHA_MODE=turnstile`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET`
