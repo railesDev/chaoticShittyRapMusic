@@ -1,8 +1,10 @@
 import type { Handler } from '@netlify/functions'
+import crypto from 'node:crypto'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
 const PREVIEW_CHAT_ID = process.env.PREVIEW_CHAT_ID || ''
+const SIGNING_SECRET = process.env.SIGNING_SECRET || ''
 
 function sanitize(text: string) {
   return (text || '')
@@ -21,6 +23,22 @@ async function tgApi(method: string, form?: FormData) {
 }
 
 const handler: Handler = async (event) => {
+  // Require signed cookie minted by backend
+  try {
+    const cookie = event.headers.cookie || ''
+    const m = cookie.match(/sub_token=([^;]+)/)
+    if (!m) return { statusCode: 403, body: 'Forbidden' }
+    const token = m[1]
+    const [tsStr, sig] = token.split('.')
+    const ts = parseInt(tsStr || '', 10)
+    if (!ts || !sig) return { statusCode: 403, body: 'Forbidden' }
+    const h = crypto.createHmac('sha256', SIGNING_SECRET)
+    h.update(String(ts))
+    const expect = `${ts}.${h.digest('base64url')}`
+    if (expect !== token) return { statusCode: 403, body: 'Forbidden' }
+  } catch {
+    return { statusCode: 403, body: 'Forbidden' }
+  }
   try {
     const q = event.queryStringParameters || {}
     let idRaw = q.cu || q.id || ''

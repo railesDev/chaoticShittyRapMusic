@@ -41,6 +41,17 @@ function verify(token: string) {
   }
 }
 
+function verifySigOnly(token: string) {
+  try {
+    const [tsStr, sig] = token.split('.')
+    const ts = parseInt(tsStr, 10)
+    if (!ts || !sig) return false
+    return sign(ts) === token
+  } catch {
+    return false
+  }
+}
+
 function sanitize(text: string) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -164,6 +175,13 @@ const handler: Handler = async (event) => {
 
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID || !SIGNING_SECRET) {
     return { statusCode: 500, body: 'Server not configured' }
+  }
+
+  // Require signed cookie minted by backend (auth)
+  const cookieAuth = event.headers.cookie || ''
+  const mAuth = cookieAuth.match(/sub_token=([^;]+)/)
+  if (!mAuth || !verifySigOnly(mAuth[1])) {
+    return { statusCode: 403, body: 'Forbidden' }
   }
 
   let parsed: any
