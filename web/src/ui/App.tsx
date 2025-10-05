@@ -282,57 +282,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={contentWrap}>
-        {previewUrl && (
-          <div style={{ marginTop: 16 }}>
-            {previewKind === 'image' && (
-              <div style={{ position: 'relative' }}>
-                <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 20, border: '1px solid var(--border)' }} />
-                <button type="button" onClick={clearFile} title="Удалить" style={{ position: 'absolute', right: 10, bottom: 10, width: 40, height: 40, borderRadius: 12, background: 'rgba(0,0,0,0.55)', border: '1px solid var(--border)', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            )}
-            {previewKind === 'audio' && (
-              <div style={{ position: 'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button type="button" aria-label={audioPlaying ? 'Пауза' : 'Воспроизвести'} onClick={() => {
-                    const a = audioRef.current
-                    if (!a) return
-                    if (audioPlaying) { a.pause(); setAudioPlaying(false) } else { a.play().catch(()=>{}); setAudioPlaying(true) }
-                  }} style={{ width: 44, height: 44, borderRadius: 999, border: '1px solid var(--accent)', color: 'var(--accent)', background: 'transparent', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
-                    {audioPlaying ? <Pause size={22}/> : <Play size={22}/>}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8 }}>
-                      <div style={{ color: 'var(--text)', fontWeight: 500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{audioMeta?.name || 'Аудио'}</div>
-                      <div style={{ color: 'var(--muted)', flex: '0 0 auto' }}>{formatTime(audioMeta?.duration || 0)}</div>
-                    </div>
-                    <div style={{ position: 'relative', height: 4, marginTop: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
-                      <div style={{ position:'absolute', left: 0, top:0, bottom:0, width: `${progressPct(audioTime, audioMeta?.duration)}%`, background: 'var(--accent)', borderRadius: 999 }} />
-                    </div>
-                  </div>
-                  <button type="button" onClick={clearFile} title="Удалить" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-                <audio ref={audioRef} src={previewUrl} style={{ display:'none' }} onLoadedMetadata={(e) => {
-                  const a = e.currentTarget
-                  setAudioMeta(m => ({ name: m?.name || 'Аудио', duration: a.duration || 0 }))
-                }} onTimeUpdate={(e) => setAudioTime(e.currentTarget.currentTime)} onEnded={() => { setAudioPlaying(false); setAudioTime(0) }} />
-              </div>
-            )}
-            {previewKind === 'file' && (
-              <div style={{ position: 'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 16, color: 'var(--muted)' }}>
-                Файл готов к отправке
-                <button type="button" onClick={clearFile} title="Удалить" style={{ position:'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <div style={contentWrap}></div>
 
       <div style={composerWrap}>
         <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
@@ -348,6 +298,56 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {previewUrl && (
+            <div style={{ margin: '8px 0' }}>
+              {previewKind === 'image' && (
+                <div style={{ position: 'relative' }}>
+                  <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 20, border: '1px solid var(--border)' }} />
+                  <button type="button" onClick={clearFile} title="Удалить" style={{ position: 'absolute', right: 10, bottom: 10, width: 40, height: 40, borderRadius: 12, background: 'rgba(0,0,0,0.55)', border: '1px solid var(--border)', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+              )}
+              {previewKind === 'audio' && (
+                <div style={{ position: 'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button type="button" aria-label={audioPlaying ? 'Пауза' : 'Воспроизвести'} onClick={() => {
+                      const a = audioRef.current
+                      if (!a) return
+                      if (audioPlaying) { a.pause(); setAudioPlaying(false) } else { a.play().catch(()=>{}); setAudioPlaying(true) }
+                    }} style={{ width: 44, height: 44, borderRadius: 999, border: '1px solid var(--accent)', color: 'var(--accent)', background: 'transparent', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                      {audioPlaying ? <Pause size={22}/> : <Play size={22}/>}
+                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8 }}>
+                        <div style={{ color: 'var(--text)', fontWeight: 500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{audioMeta?.name || 'Аудио'}</div>
+                        <div style={{ color: 'var(--muted)', flex: '0 0 auto' }}>{formatTime(audioMeta?.duration || 0)}</div>
+                      </div>
+                      <div style={{ position: 'relative', height: 4, marginTop: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
+                        <div style={{ position:'absolute', left: 0, top:0, bottom:0, width: `${progressPct(audioTime, audioMeta?.duration)}%`, background: 'var(--accent)', borderRadius: 999 }} />
+                      </div>
+                    </div>
+                    <button type="button" onClick={clearFile} title="Удалить" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                  <audio ref={audioRef} src={previewUrl} style={{ display:'none' }} onLoadedMetadata={(e) => {
+                    const a = e.currentTarget
+                    setAudioMeta(m => ({ name: m?.name || 'Аудио', duration: a.duration || 0 }))
+                  }} onTimeUpdate={(e) => setAudioTime(e.currentTarget.currentTime)} onEnded={() => { setAudioPlaying(false); setAudioTime(0) }} />
+                </div>
+              )}
+              {previewKind === 'file' && (
+                <div style={{ position: 'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 16, color: 'var(--muted)' }}>
+                  Файл готов к отправке
+                  <button type="button" onClick={clearFile} title="Удалить" style={{ position:'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
         <form onSubmit={handleSubmit} style={composerInner}>
           <div style={composerBox}>
