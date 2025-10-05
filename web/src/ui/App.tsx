@@ -234,7 +234,8 @@ export default function App() {
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
   // Align items vertically centered inside the pill so placeholder sits on one line with icons
   const composerBoxBase: React.CSSProperties = { display: 'flex', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '0 10px 6px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset', alignItems: 'flex-end', minHeight: 44 }
-  const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
+  // Slight vertical nudge so icons are perfectly centered relative to text baseline
+  const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transform: 'translateY(-2px)' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
