@@ -118,6 +118,24 @@ export default function App() {
   }
 
 
+  // Prevent page scroll (especially on iOS when keyboard is open).
+  // Allow vertical scroll only inside the composer editable box.
+  React.useEffect(() => {
+    const onTouchMove = (e: TouchEvent) => {
+      const editable = (taRef.current as unknown as HTMLElement | null)
+      const t = e.target as HTMLElement | null
+      if (editable && t && editable.contains(t)) {
+        const canScroll = editable.scrollHeight > editable.clientHeight
+        if (!canScroll) e.preventDefault()
+        return
+      }
+      e.preventDefault()
+    }
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => window.removeEventListener('touchmove', onTouchMove)
+  }, [])
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -386,6 +404,7 @@ export default function App() {
               role="textbox"
               aria-multiline="true"
               data-placeholder="Поделись тем, что важно"
+              onTouchMoveCapture={(e)=>{ e.stopPropagation() }}
               onInput={(e)=>{
                 const v = (e.currentTarget as HTMLDivElement).innerText
                 setText(v)
@@ -403,7 +422,8 @@ export default function App() {
                 color: 'var(--text)',
                 borderRadius: 28,
                 whiteSpace: 'pre-wrap',
-                overflowWrap: 'anywhere'
+                overflowWrap: 'anywhere',
+                touchAction: 'pan-y'
               }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>

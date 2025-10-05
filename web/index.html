@@ -31,7 +31,7 @@
         position: fixed; inset: 0; /* lock page scroll */
       }
       * { box-sizing: border-box; }
-      #root { height: 100dvh; position: fixed; inset: 0; overflow: hidden; }
+      #root { height: 100dvh; position: fixed; inset: 0; overflow: hidden; touch-action: none; }
       html, body { overscroll-behavior-y: none; overscroll-behavior-x: none; }
       input, textarea, button { font-family: inherit; font-size: inherit; }
       #reply-input::placeholder { color: var(--muted); opacity: 1; }
