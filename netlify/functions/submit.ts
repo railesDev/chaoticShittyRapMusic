@@ -7,6 +7,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
 const SIGNING_SECRET = process.env.SIGNING_SECRET || ''
 const CAPTCHA_MODE = (process.env.CAPTCHA_MODE || 'turnstile').toLowerCase()
+const DEBUG = process.env.DEBUG === '1'
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET || ''
 const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET || ''
 const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6', 10)
@@ -46,9 +47,11 @@ function generateCuId() {
   return `cu-${ts}${rnd}`
 }
 
-async function verifyCaptcha(token: string | undefined) {
-  if (CAPTCHA_MODE === 'none') return true
-  if (!token) return false
+type CaptchaResult = { ok: boolean; details?: any; reason?: string }
+
+async function verifyCaptcha(token: string | undefined): Promise<CaptchaResult> {
+  if (CAPTCHA_MODE === 'none') return { ok: true }
+  if (!token) return { ok: false, reason: 'missing-token' }
   if (CAPTCHA_MODE === 'turnstile' && TURNSTILE_SECRET) {
     const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
@@ -56,7 +59,8 @@ async function verifyCaptcha(token: string | undefined) {
       body: new URLSearchParams({ secret: TURNSTILE_SECRET, response: token })
     })
     const j = await r.json().catch(() => ({} as any))
-    return !!j.success
+    if (DEBUG) console.log('Turnstile verify:', j)
+    return { ok: !!j.success, details: j }
   }
   if (CAPTCHA_MODE === 'hcaptcha' && HCAPTCHA_SECRET) {
     const r = await fetch('https://hcaptcha.com/siteverify', {
@@ -65,9 +69,10 @@ async function verifyCaptcha(token: string | undefined) {
       body: new URLSearchParams({ secret: HCAPTCHA_SECRET, response: token })
     })
     const j = await r.json().catch(() => ({} as any))
-    return !!j.success
+    if (DEBUG) console.log('hCaptcha verify:', j)
+    return { ok: !!j.success, details: j }
   }
-  return false
+  return { ok: false, reason: 'misconfigured' }
 }
 
 function basicModeration(text: string) {
@@ -140,8 +145,17 @@ const handler: Handler = async (event) => {
   const honeypot = getField('honeypot')
 
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
-  const captchaOk = await verifyCaptcha(token)
-  if (!captchaOk) return { statusCode: 400, body: 'Captcha failed' }
+  const captcha = await verifyCaptcha(token)
+  if (!captcha.ok) {
+    if (DEBUG) {
+      return {
+        statusCode: 400,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ error: 'captcha_failed', mode: CAPTCHA_MODE, debug: captcha })
+      }
+    }
+    return { statusCode: 400, body: 'Captcha failed' }
+  }
 
   const cookie = event.headers.cookie || ''
   const match = cookie.match(/sub_token=([^;]+)/)
