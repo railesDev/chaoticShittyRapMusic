@@ -6,8 +6,7 @@ import { fileTypeFromBuffer } from 'file-type'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
 const SIGNING_SECRET = process.env.SIGNING_SECRET || ''
-const CAPTCHA_MODE = (process.env.CAPTCHA_MODE || 'none').toLowerCase()
-const DEBUG = process.env.DEBUG === '1'
+const CAPTCHA_MODE = (process.env.CAPTCHA_MODE || 'turnstile').toLowerCase()
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET || ''
 const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET || ''
 const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6', 10)
@@ -49,10 +48,7 @@ function generateCuId() {
 
 async function verifyCaptcha(token: string | undefined) {
   if (CAPTCHA_MODE === 'none') return true
-  if (!token) {
-    if (DEBUG) console.warn('Captcha token missing')
-    return false
-  }
+  if (!token) return false
   if (CAPTCHA_MODE === 'turnstile' && TURNSTILE_SECRET) {
     const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
@@ -60,7 +56,6 @@ async function verifyCaptcha(token: string | undefined) {
       body: new URLSearchParams({ secret: TURNSTILE_SECRET, response: token })
     })
     const j = await r.json().catch(() => ({} as any))
-    if (DEBUG) console.log('Turnstile verify:', j)
     return !!j.success
   }
   if (CAPTCHA_MODE === 'hcaptcha' && HCAPTCHA_SECRET) {
@@ -70,10 +65,8 @@ async function verifyCaptcha(token: string | undefined) {
       body: new URLSearchParams({ secret: HCAPTCHA_SECRET, response: token })
     })
     const j = await r.json().catch(() => ({} as any))
-    if (DEBUG) console.log('hCaptcha verify:', j)
     return !!j.success
   }
-  if (DEBUG) console.warn('Captcha mode set but secret missing or unsupported mode:', CAPTCHA_MODE)
   return false
 }
 
@@ -120,7 +113,17 @@ const handler: Handler = async (event) => {
 
   function getField(name: string) {
     const key = fieldsMap[name]
-    return key ? parsed.fields[key] : undefined
+    const v = key ? parsed.fields[key] : undefined
+    if (v !== undefined) return v
+    // Fallbacks for robustness
+    if (name === 'token') {
+      return (
+        (parsed.fields['token'] as string | undefined) ||
+        (parsed.fields['cf-turnstile-response'] as string | undefined) ||
+        (parsed.fields['h-captcha-response'] as string | undefined)
+      )
+    }
+    return parsed.fields[name]
   }
 
   const token = getField('token')

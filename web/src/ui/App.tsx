@@ -94,6 +94,11 @@ export default function App() {
       fd.set(fields.get('text')!, text)
       fd.set(fields.get('token')!, captchaToken)
       fd.set(fields.get('honeypot')!, hpRef.current?.value || '')
+      // Add non-obfuscated fallbacks to improve compatibility
+      if (captchaToken) {
+        fd.set('token', captchaToken)
+        fd.set('cf-turnstile-response', captchaToken)
+      }
       if (fileRef.current?.files?.[0]) fd.set(fields.get('file')!, fileRef.current.files[0])
 
       // Wrap fields map (light obfuscation)
