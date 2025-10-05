@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
+import { Paperclip, Send, Reply, Trash2 } from 'lucide-react'
 
 type SubmitState = 'idle' | 'submitting' | 'done' | 'error'
 
@@ -248,7 +249,7 @@ export default function App() {
         <div style={{ marginTop: 12 }}>
           <div style={label}>Ответить на</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
-            <CornerUpRight size={20} color={'var(--accent)'} />
+            <Reply size={20} color={'var(--accent)'} />
             <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={{ flex: '0 0 220px', padding: 10, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
           </div>
           {replyInput && (

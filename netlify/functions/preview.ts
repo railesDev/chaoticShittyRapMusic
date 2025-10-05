@@ -37,10 +37,17 @@ const handler: Handler = async (event) => {
     const r = await fetch(url, { method: 'POST', body: fd })
     const j = await r.json().catch(()=>({ ok:false }))
     let text = ''
+    let kind = ''
     if (j.ok && Array.isArray(j.result)) {
       for (const u of j.result) {
         const msg = u.channel_post || u.edited_channel_post
-        if (msg && msg.chat && String(msg.chat.username || msg.chat.id) && msg.message_id === msgId) {
+        if (msg && msg.message_id === msgId) {
+          if (msg.photo) kind = 'Фото'
+          else if (msg.audio) kind = 'Аудио'
+          else if (msg.voice) kind = 'Голосовое'
+          else if (msg.document) kind = 'Документ'
+          else if (msg.sticker) kind = 'Стикер'
+          else if (msg.video) kind = 'Видео'
           text = msg.caption || msg.text || ''
           break
         }
@@ -48,12 +55,11 @@ const handler: Handler = async (event) => {
     }
     // Strip leading cu-<id>
     if (text) text = text.replace(/^\s*cu-\d+\s*\n?\n?/i, '')
+    let preview = text
+    if (kind) preview = `${kind}${preview ? `\n${preview}` : ''}`
+    if (!preview) return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: false }) }
 
-    if (!text) {
-      return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: false }) }
-    }
-
-    return { statusCode: 200, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: true, id: msgId, text: sanitize(text).slice(0,200) }) }
+    return { statusCode: 200, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: true, id: msgId, text: sanitize(preview).slice(0,200) }) }
   } catch (e: any) {
     return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: false }) }
   }
