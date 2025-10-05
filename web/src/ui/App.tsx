@@ -133,15 +133,19 @@ export default function App() {
   }, [])
 
 
-  // Prevent page scroll (especially on iOS when keyboard is open).
-  // Allow vertical scroll only inside the composer editable box.
+  // Prevent page scroll (especially on iOS).
+  // Allow vertical scroll inside composer editable or the content box between header and composer.
   React.useEffect(() => {
     const onTouchMove = (e: TouchEvent) => {
       const editable = (taRef.current as unknown as HTMLElement | null)
+      const scrollBox = (contentRef.current as unknown as HTMLElement | null)
       const t = e.target as HTMLElement | null
       if (editable && t && editable.contains(t)) {
         const canScroll = editable.scrollHeight > editable.clientHeight
         if (!canScroll) e.preventDefault()
+        return
+      }
+      if (scrollBox && t && scrollBox.contains(t)) {
         return
       }
       e.preventDefault()
@@ -229,6 +233,12 @@ export default function App() {
       lastUsedTokenVersionRef.current = tokenVersionRef.current
       // reset inputs on success
       setText('')
+      setReplyInput('')
+      setReplyPreview('')
+      try {
+        const el = taRef.current as unknown as HTMLDivElement | null
+        if (el) el.innerText = ''
+      } catch {}
       if (fileRef.current) fileRef.current.value = ''
       setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
       setState('done')
@@ -258,8 +268,8 @@ export default function App() {
   const headerRow: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10 }
   const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
-  // Content area is not scrollable per requirement; only composer text may scroll
-  const contentWrap: React.CSSProperties = { position: 'fixed', top: `calc(var(--vv-top, 0px) + ${HEADER_H}px)`, left: 0, right: 0, bottom: `calc(${FOOTER_SPACE}px + var(--vv-bottom, 0px))`, overflow: 'hidden', padding: '8px 16px' }
+  // Scrollable content area between sticky header and composer
+  const contentWrap: React.CSSProperties = { position: 'fixed', top: `calc(var(--vv-top, 0px) + ${HEADER_H}px)`, left: 0, right: 0, bottom: `calc(${FOOTER_SPACE}px + var(--vv-bottom, 0px))`, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any, padding: '8px 16px' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 'var(--vv-bottom, 0px)', zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
   const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column', position: 'relative' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
@@ -273,6 +283,7 @@ export default function App() {
   const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
   const [audioMeta, setAudioMeta] = useState<{name: string; duration: number} | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -340,25 +351,22 @@ export default function App() {
         </div>
       </div>
 
-      <div style={contentWrap}></div>
-
-      <div style={composerWrap}>
-        <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
+      <div style={contentWrap} ref={contentRef}>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ marginBottom: 8 }}>
             <div style={label}>Ответить на</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
               <Reply size={24} color={'var(--accent)'} />
               <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
             </div>
-            {replyInput && (
-              <div style={{ marginTop: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
-                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
-              </div>
-            )}
           </div>
-
+          {replyInput && (
+            <div style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+            </div>
+          )}
           {previewUrl && (
-            <div style={{ margin: '8px 0' }}>
+            <div style={{ margin: '8px 0 12px' }}>
               {previewKind === 'image' && (
                 <div style={{ position: 'relative' }}>
                   <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 20, border: '1px solid var(--border)' }} />
@@ -406,7 +414,11 @@ export default function App() {
               )}
             </div>
           )}
+        </div>
+      </div>
 
+      <div style={composerWrap}>
+        <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
         <form onSubmit={handleSubmit} style={composerInner}>
           <div style={composerBoxBase}>
             <button type="button" onClick={onPickFile} title="Вложение" style={iconBtnPlain}>
