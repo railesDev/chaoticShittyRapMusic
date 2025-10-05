@@ -115,7 +115,6 @@ export default function App() {
     })
   }
 
-  const [sendState, setSendState] = useState<'idle'|'sending'|'success'>('idle')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -132,7 +131,6 @@ export default function App() {
       return
     }
     setState('submitting')
-    setSendState('sending')
     setSendState('sending')
     try {
       const fd = new FormData()
