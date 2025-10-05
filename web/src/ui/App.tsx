@@ -232,10 +232,10 @@ export default function App() {
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 14, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
   const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
-  // Align items vertically centered inside the pill so placeholder sits on one line with icons
-  const composerBoxBase: React.CSSProperties = { display: 'flex', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '0 10px 6px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset', alignItems: 'flex-end', minHeight: 44 }
-  // Slight vertical nudge so icons are perfectly centered relative to text baseline
-  const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transform: 'translateY(-2px)' }
+  // Align items to the center so icons, placeholder and text stay on one level
+  const composerBoxBase: React.CSSProperties = { display: 'flex', gap: 8, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '4px 10px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset', alignItems: 'center', minHeight: 48 }
+  // Plain icon button, vertically centered without extra translate hacks
+  const iconBtnPlain: React.CSSProperties = { width: 40, height: 40, border: 'none', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
   const replyInputStyle: React.CSSProperties = { flex: '0 0 210px', padding: '8px 12px', borderRadius: 14, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 14 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -310,18 +310,6 @@ export default function App() {
 
       <div style={composerWrap}>
         <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
-          <div style={{ marginBottom: 8 }}>
-            <div style={label}>Ответить на</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
-            <Reply size={24} color={'var(--accent)'} />
-            <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
-            </div>
-            {replyInput && (
-              <div style={{ marginTop: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
-                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
-              </div>
-            )}
-          </div>
 
           {previewUrl && (
             <div style={{ margin: '8px 0' }}>
@@ -378,6 +366,10 @@ export default function App() {
             <button type="button" onClick={onPickFile} title="Вложение" style={iconBtnPlain}>
               <Paperclip size={22} />
             </button>
+            <div style={{ display:'flex', alignItems:'center', gap: 8, color:'var(--muted)' }}>
+              <Reply size={20} color={'var(--accent)'} />
+              <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
+            </div>
             <div
               className="composer-editable"
               ref={taRef as any}
@@ -391,9 +383,9 @@ export default function App() {
               }}
               style={{
                 flex: 1,
-                minHeight: 20,
+                minHeight: 24,
                 lineHeight: '20px',
-                padding: '0 14px 6px',
+                padding: '10px 14px',
                 outline: 'none',
                 background: 'transparent',
                 color: 'var(--text)',
@@ -411,6 +403,11 @@ export default function App() {
               )}
             </button>
           </div>
+          {replyInput && (
+            <div style={{ marginTop: 8, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+            </div>
+          )}
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
