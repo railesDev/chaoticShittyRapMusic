@@ -12,6 +12,9 @@ const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET || ''
 const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET || ''
 const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6', 10)
 const RATE_LIMIT_MINUTES = parseInt(process.env.RATE_LIMIT_MINUTES || '1', 10)
+const RATE_LIMIT_SECONDS_ENV = parseInt(process.env.RATE_LIMIT_SECONDS || '10', 10)
+const RATE_WINDOW_SECONDS = Number.isFinite(RATE_LIMIT_SECONDS_ENV) ? RATE_LIMIT_SECONDS_ENV : (RATE_LIMIT_MINUTES * 60)
+const COUNTER_STORAGE_CHAT_ID = process.env.COUNTER_STORAGE_CHAT_ID || ''
 
 function b64e(buf: Buffer) {
   return buf.toString('base64url')
@@ -30,7 +33,7 @@ function verify(token: string) {
     const ts = parseInt(tsStr, 10)
     if (!ts || !sig) return { ok: false, why: 'bad' }
     if (sign(ts) !== token) return { ok: false, why: 'sig' }
-    if (Date.now() / 1000 - ts < RATE_LIMIT_MINUTES * 60) return { ok: false, why: 'rate' }
+    if (Date.now() / 1000 - ts < RATE_WINDOW_SECONDS) return { ok: false, why: 'rate' }
     return { ok: true }
   } catch {
     return { ok: false, why: 'bad' }
@@ -92,6 +95,24 @@ async function tgApi(method: string, form?: FormData) {
   const j = await r.json()
   if (!j.ok) throw new Error(`tg error: ${JSON.stringify(j)}`)
   return j.result
+}
+
+async function editText(chatId: string, messageId: number, text: string) {
+  const fd = new FormData()
+  fd.append('chat_id', chatId)
+  fd.append('message_id', String(messageId))
+  fd.append('text', text)
+  fd.append('parse_mode', 'HTML')
+  return tgApi('editMessageText', fd)
+}
+
+async function editCaption(chatId: string, messageId: number, caption: string) {
+  const fd = new FormData()
+  fd.append('chat_id', chatId)
+  fd.append('message_id', String(messageId))
+  fd.append('caption', caption)
+  fd.append('parse_mode', 'HTML')
+  return tgApi('editMessageCaption', fd)
 }
 
 async function getNumericChatId(): Promise<number> {
@@ -198,6 +219,9 @@ const handler: Handler = async (event) => {
 
   const token = getField('token') as string | undefined
   let text = String(getField('text') || '').trim()
+  const replyRaw = String(getField('reply_to') || '').trim()
+  const replyMatch = replyRaw.match(/cu[-: ]?(\d+)/i)
+  const replyToMessageId = replyMatch ? parseInt(replyMatch[1], 10) : undefined
   const honeypot = getField('honeypot')
 
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
@@ -276,55 +300,79 @@ const handler: Handler = async (event) => {
   }
 
   const captionBase = sanitize(text)
-  // Determine counter from description right before sending
-  let cuNumber = 1
+  // Reserve counter for description in a private storage chat (optional)
+  let totalCounter = 0
   try {
-    const chat = await getChatInfo()
-    const fromDesc = extractCounterFromDesc(chat?.description)
-    cuNumber = (fromDesc || 0) + 1
+    if (COUNTER_STORAGE_CHAT_ID) {
+      const fdReserve = new FormData()
+      fdReserve.append('chat_id', COUNTER_STORAGE_CHAT_ID)
+      fdReserve.append('text', `reserve ${Date.now()}`)
+      fdReserve.append('disable_notification', 'true')
+      const r = await tgApi('sendMessage', fdReserve)
+      totalCounter = r.message_id as number
+    }
   } catch {}
-  const finalPrefix = `cu-${cuNumber}`
 
   try {
     if (content) {
       const fd = new FormData()
       if (mime?.startsWith('image/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
+        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
         fd.append('photo', new Blob([content], { type: mime }), filename || 'image')
-        await tgApi('sendPhoto', fd)
+        const sent = await tgApi('sendPhoto', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('audio/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
+        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
         fd.append('audio', new Blob([content], { type: mime }), filename || 'audio')
-        await tgApi('sendAudio', fd)
+        const sent = await tgApi('sendAudio', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('video/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
+        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
         fd.append('video', new Blob([content], { type: mime }), filename || 'video')
-        await tgApi('sendVideo', fd)
+        const sent = await tgApi('sendVideo', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       } else {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
+        if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
+        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
         fd.append('document', new Blob([content], { type: mime || 'application/octet-stream' }), filename || 'file')
-        await tgApi('sendDocument', fd)
+        const sent = await tgApi('sendDocument', fd)
+        const id = sent.message_id as number
+        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
       }
     } else {
       const fd = new FormData()
       fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-      fd.append('text', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
+      fd.append('text', captionBase || '...')
       fd.append('parse_mode', 'HTML')
-      await tgApi('sendMessage', fd)
+      if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
+      const sent = await tgApi('sendMessage', fd)
+      const id = sent.message_id as number
+      const finalText = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
+      await editText(TELEGRAM_CHANNEL_ID, id, finalText)
     }
 
     // Persist last counter in channel description (best-effort)
     try {
       const chat = await getChatInfo()
-      const newDesc = upsertCounterInDesc(chat?.description, cuNumber)
+      const newDesc = upsertCounterInDesc(chat?.description, totalCounter > 0 ? totalCounter : extractCounterFromDesc(chat?.description) + 1)
       const fdDesc = new FormData()
       fdDesc.append('chat_id', TELEGRAM_CHANNEL_ID)
       fdDesc.append('description', newDesc)

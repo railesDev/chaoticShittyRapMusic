@@ -113,6 +113,7 @@ export default function App() {
         fd.set('token', tokenToSend)
         fd.set('cf-turnstile-response', tokenToSend)
       }
+      if (replyInput.trim()) fd.set('reply_to', replyInput.trim())
       if (fileRef.current?.files?.[0]) fd.set(fields.get('file')!, fileRef.current.files[0])
 
       // Wrap fields map (light obfuscation)
@@ -160,12 +161,15 @@ export default function App() {
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
-  const primaryBtn: React.CSSProperties = { padding: '12px 18px', borderRadius: 999, border: '1px solid var(--accent)', background: 'var(--accent)', color: '#0b0b0f', fontWeight: 500, letterSpacing: 0.2, cursor: 'pointer', boxShadow: '0 6px 24px rgba(124,92,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 8 }
+  const primaryBtn: React.CSSProperties = { padding: '12px 18px', borderRadius: 999, border: '1px solid var(--accent)', background: 'var(--accent)', color: '#0b0b0f', fontWeight: 500, letterSpacing: 0.2, cursor: 'pointer', boxShadow: '0 8px 28px rgba(113,195,203,0.35)', display: 'inline-flex', alignItems: 'center', gap: 8 }
   const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }
-  const chip: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, background: 'rgba(124,92,255,0.15)', color: 'var(--accent-2)', fontWeight: 500, display: 'inline-block' }
+  const chip: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 500, display: 'inline-block' }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
+  const [replyInput, setReplyInput] = useState('')
+  const [replyPreview, setReplyPreview] = useState<string>('')
+  const [replyOpen, setReplyOpen] = useState(true)
 
   const onPickFile = useCallback(() => fileRef.current?.click(), [])
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,6 +187,22 @@ export default function App() {
     setPreviewUrl(null); setPreviewKind(null)
   }, [])
 
+  React.useEffect(() => {
+    const m = replyInput.match(/(?:cu[-: ]?)?(\d+)/i)
+    if (!m) { setReplyPreview(''); return }
+    const id = m[1]
+    const ctrl = new AbortController()
+    ;(async () => {
+      try {
+        const r = await fetch(`${API_BASE}/preview?cu=${id}`, { signal: ctrl.signal })
+        if (!r.ok) return
+        const j = await r.json()
+        if (j?.ok && String(j.id) === id) setReplyPreview(j.text || '')
+      } catch {}
+    })()
+    return () => ctrl.abort()
+  }, [replyInput])
+
   return (
     <div style={container}>
       <div>
@@ -193,6 +213,17 @@ export default function App() {
 
       <div style={card}>
         <form onSubmit={handleSubmit}>
+          <div style={label}>Ответить на сообщение (cu-XXX)</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-123" style={{ flex: '0 0 220px', padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
+            {!!replyPreview && <button type="button" onClick={()=>setReplyOpen(v=>!v)} style={{ ...ghostBtn, padding: '8px 12px' }}>{replyOpen ? 'Свернуть цитату' : 'Показать цитату'}</button>}
+            {replyInput && <button type="button" onClick={()=>{setReplyInput(''); setReplyPreview('')}} style={{ ...ghostBtn, borderColor: 'var(--border)', color: 'var(--muted)', padding: '8px 12px' }}>Очистить</button>}
+          </div>
+          {replyPreview && replyOpen && (
+            <div style={{ marginTop: 10, borderLeft: '3px solid var(--accent)', paddingLeft: 12, color: 'var(--muted)' }}>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{replyPreview.slice(0, 800)}</div>
+            </div>
+          )}
           <div style={label}>Сообщение</div>
           <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder="Напишите, что важно…" rows={8} style={textareaStyle} />
 
