@@ -198,6 +198,7 @@ export default function App() {
   const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }
   const attachBtn: React.CSSProperties = { width: 52, height: 52, borderRadius: 18, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center' }
   const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 500, display: 'inline-block' }
+  const replyInputStyle: React.CSSProperties = { flex: '0 0 260px', padding: '12px 16px', borderRadius: 18, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 20 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
@@ -259,18 +260,18 @@ export default function App() {
       </div>
 
       <div style={composerWrap}>
-        <div style={{ maxWidth: 900, margin: '0 auto 8px' }}>
-          <div style={label}>Ответить на</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
-            <Reply size={20} color={'var(--accent)'} />
-            <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={{ flex: '0 0 220px', padding: 10, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
-          </div>
-          {replyInput && (
-            <div style={{ marginTop: 8, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
-              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+          <div style={{ maxWidth: 900, margin: '0 auto 8px' }}>
+            <div style={label}>Ответить на</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
+            <Reply size={24} color={'var(--accent)'} />
+            <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
             </div>
-          )}
-        </div>
+            {replyInput && (
+              <div style={{ marginTop: 8, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
+                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+              </div>
+            )}
+          </div>
 
         <form onSubmit={handleSubmit} style={composerInner}>
           <button type="button" onClick={onPickFile} title="Вложение" style={attachBtn}><Paperclip size={20} /></button>
