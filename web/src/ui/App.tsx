@@ -225,7 +225,8 @@ export default function App() {
   const headerRow: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10 }
   const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
-  const contentWrap: React.CSSProperties = { position: 'fixed', top: HEADER_H, left: 0, right: 0, bottom: FOOTER_SPACE, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any, padding: '8px 16px' }
+  // Content area is not scrollable per requirement; only composer text may scroll
+  const contentWrap: React.CSSProperties = { position: 'fixed', top: HEADER_H, left: 0, right: 0, bottom: FOOTER_SPACE, overflow: 'hidden', padding: '8px 16px' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
   const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column', position: 'relative' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
@@ -392,13 +393,17 @@ export default function App() {
               style={{
                 flex: 1,
                 minHeight: 24,
+                maxHeight: 140,
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
                 lineHeight: '20px',
                 padding: '10px 14px',
                 outline: 'none',
                 background: 'transparent',
                 color: 'var(--text)',
                 borderRadius: 28,
-                whiteSpace: 'pre-wrap'
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere'
               }}
             />
             <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={iconBtnPlain}>
