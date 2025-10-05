@@ -331,6 +331,15 @@ export default function App() {
     return () => ctrl.abort()
   }, [replyInput])
 
+  // Always keep the content area scrolled to the bottom so blocks (reply/preview) hug the composer.
+  React.useEffect(() => {
+    const c = contentRef.current
+    if (!c) return
+    // Defer to next frame so layout has correct sizes
+    const id = requestAnimationFrame(() => { c.scrollTop = c.scrollHeight })
+    return () => cancelAnimationFrame(id)
+  }, [replyInput, replyPreview, previewUrl, previewKind, audioMeta])
+
   // Keep content bottom equal to the real composer height
   React.useEffect(() => {
     const update = () => {
@@ -373,8 +382,8 @@ export default function App() {
       </div>
 
       <div style={contentWrap} ref={contentRef}>
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ marginBottom: 8 }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 10 }}>
+          <div>
             <div style={label}>Ответить на</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
               <Reply size={24} color={'var(--accent)'} />
@@ -382,12 +391,12 @@ export default function App() {
             </div>
           </div>
           {replyInput && (
-            <div style={{ marginBottom: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+            <div style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
               <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
             </div>
           )}
           {previewUrl && (
-            <div style={{ margin: '8px 0 12px' }}>
+            <div>
               {previewKind === 'image' && (
                 <div style={{ position: 'relative' }}>
                   <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 20, border: '1px solid var(--border)' }} />
