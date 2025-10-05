@@ -269,7 +269,7 @@ export default function App() {
   const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 16, fontWeight: 500 }
   // Scrollable content area between sticky header and composer
-  const contentWrap: React.CSSProperties = { position: 'fixed', top: `calc(var(--vv-top, 0px) + ${HEADER_H}px)`, left: 0, right: 0, bottom: `calc(${FOOTER_SPACE}px + var(--vv-bottom, 0px))`, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any, padding: '8px 16px' }
+  const contentWrap: React.CSSProperties = { position: 'fixed', top: `calc(var(--vv-top, 0px) + ${HEADER_H}px)`, left: 0, right: 0, bottom: 'calc(var(--composer-h, 180px) + var(--vv-bottom, 0px))', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' as any, padding: '8px 16px' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 'var(--vv-bottom, 0px)', zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
   const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column', position: 'relative' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500, fontSize: 14 }
@@ -284,6 +284,7 @@ export default function App() {
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const composerRef = useRef<HTMLDivElement | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
   const [audioMeta, setAudioMeta] = useState<{name: string; duration: number} | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -329,6 +330,26 @@ export default function App() {
     })()
     return () => ctrl.abort()
   }, [replyInput])
+
+  // Keep content bottom equal to the real composer height
+  React.useEffect(() => {
+    const update = () => {
+      const el = composerRef.current
+      const h = el ? Math.ceil(el.getBoundingClientRect().height) : FOOTER_SPACE
+      document.documentElement.style.setProperty('--composer-h', `${h}px`)
+    }
+    update()
+    const vv: any = (window as any).visualViewport
+    const ro: any = (window as any).ResizeObserver ? new (window as any).ResizeObserver(() => update()) : null
+    if (ro && composerRef.current) ro.observe(composerRef.current)
+    window.addEventListener('resize', update)
+    vv?.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      vv?.removeEventListener('resize', update)
+      try { ro && composerRef.current && ro.unobserve(composerRef.current) } catch {}
+    }
+  }, [text, replyInput, previewUrl, previewKind, audioMeta, sendState])
 
   function formatTime(total: number) {
     if (!Number.isFinite(total) || total <= 0) return '00:00'
@@ -417,7 +438,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={composerWrap}>
+      <div style={composerWrap} ref={composerRef}>
         <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
         <form onSubmit={handleSubmit} style={composerInner}>
           <div style={composerBoxBase}>
