@@ -186,7 +186,7 @@ export default function App() {
   // Styles
   const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px' }
   const headerWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)', padding: '20px 0 12px' }
-  const title: React.CSSProperties = { fontSize: 40, fontWeight: 500, margin: '8px 0 6px', letterSpacing: -0.5 }
+  const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 500, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18, fontWeight: 500 }
   const contentWrap: React.CSSProperties = { paddingTop: 8, paddingBottom: 120, minHeight: 'calc(100vh - 180px)' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
@@ -194,9 +194,9 @@ export default function App() {
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }
   const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 16, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
-  const primaryBtn: React.CSSProperties = { padding: '12px 16px', borderRadius: 16, border: '1px solid var(--accent)', background: 'var(--bg)', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }
+  const primaryBtn: React.CSSProperties = { width: 52, height: 52, borderRadius: 18, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
   const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }
-  const attachBtn: React.CSSProperties = { padding: '10px 12px', borderRadius: 16, border: '1px solid var(--accent)', background: 'var(--bg)', color: 'var(--accent)', cursor: 'pointer' }
+  const attachBtn: React.CSSProperties = { width: 52, height: 52, borderRadius: 18, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center' }
   const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 500, display: 'inline-block' }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -246,18 +246,6 @@ export default function App() {
       </div>
 
       <div style={contentWrap}>
-        <div style={{ marginTop: 12 }}>
-          <div style={label}>Ответить на</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
-            <Reply size={20} color={'var(--accent)'} />
-            <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={{ flex: '0 0 220px', padding: 10, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
-          </div>
-          {replyInput && (
-            <div style={{ marginTop: 10, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
-              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
-            </div>
-          )}
-
         {previewUrl && (
           <div style={{ marginTop: 16, position: 'relative' }}>
             {previewKind === 'image' && <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 18, border: '1px solid var(--border)' }} />}
@@ -268,15 +256,27 @@ export default function App() {
             </button>
           </div>
         )}
-        </div>
       </div>
 
       <div style={composerWrap}>
+        <div style={{ maxWidth: 900, margin: '0 auto 8px' }}>
+          <div style={label}>Ответить на</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
+            <Reply size={20} color={'var(--accent)'} />
+            <input value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={{ flex: '0 0 220px', padding: 10, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)' }} />
+          </div>
+          {replyInput && (
+            <div style={{ marginTop: 8, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
+              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+            </div>
+          )}
+        </div>
+
         <form onSubmit={handleSubmit} style={composerInner}>
           <button type="button" onClick={onPickFile} title="Вложение" style={attachBtn}><Paperclip size={20} /></button>
           <textarea value={text} onChange={(e)=>{setText(e.target.value); const t=e.target as HTMLTextAreaElement; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Поделись тем, что важно" rows={2} style={{...textareaStyle, flex: 1, height: 56, borderRadius: 24 }} />
-          <button disabled={state==='submitting'} type="submit" style={primaryBtn}>
-            {state==='submitting' ? (<span style={{ display:'inline-flex', alignItems:'center', gap:6 }}><span style={{ width: 14, height: 14, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Отправка…</span>) : (<><Send size={18} /> Отправить</>)}
+          <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={primaryBtn}>
+            {state==='submitting' ? (<span style={{ width: 18, height: 18, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />) : (<Send size={22} />)}
           </button>
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
