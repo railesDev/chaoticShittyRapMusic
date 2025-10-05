@@ -14,7 +14,6 @@ const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6
 const RATE_LIMIT_MINUTES = parseInt(process.env.RATE_LIMIT_MINUTES || '1', 10)
 const RATE_LIMIT_SECONDS_ENV = parseInt(process.env.RATE_LIMIT_SECONDS || '10', 10)
 const RATE_WINDOW_SECONDS = Number.isFinite(RATE_LIMIT_SECONDS_ENV) ? RATE_LIMIT_SECONDS_ENV : (RATE_LIMIT_MINUTES * 60)
-const COUNTER_STORAGE_CHAT_ID = process.env.COUNTER_STORAGE_CHAT_ID || ''
 
 function b64e(buf: Buffer) {
   return buf.toString('base64url')
@@ -320,7 +319,7 @@ const handler: Handler = async (event) => {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
-        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
+        if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
         fd.append('photo', new Blob([content], { type: mime }), filename || 'image')
         const sent = await tgApi('sendPhoto', fd)
         const id = sent.message_id as number
@@ -330,7 +329,7 @@ const handler: Handler = async (event) => {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
-        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
+        if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
         fd.append('audio', new Blob([content], { type: mime }), filename || 'audio')
         const sent = await tgApi('sendAudio', fd)
         const id = sent.message_id as number
@@ -340,7 +339,7 @@ const handler: Handler = async (event) => {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
-        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
+        if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
         fd.append('video', new Blob([content], { type: mime }), filename || 'video')
         const sent = await tgApi('sendVideo', fd)
         const id = sent.message_id as number
@@ -350,7 +349,7 @@ const handler: Handler = async (event) => {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
-        if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
+        if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
         fd.append('document', new Blob([content], { type: mime || 'application/octet-stream' }), filename || 'file')
         const sent = await tgApi('sendDocument', fd)
         const id = sent.message_id as number
@@ -362,7 +361,7 @@ const handler: Handler = async (event) => {
       fd.append('chat_id', TELEGRAM_CHANNEL_ID)
       fd.append('text', captionBase || '...')
       fd.append('parse_mode', 'HTML')
-      if (replyToMessageId) { fd.append('reply_to_message_id', String(replyToMessageId)); fd.append('allow_sending_without_reply','true') }
+      if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
       const sent = await tgApi('sendMessage', fd)
       const id = sent.message_id as number
       const finalText = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
@@ -379,7 +378,11 @@ const handler: Handler = async (event) => {
       await tgApi('setChatDescription', fdDesc)
     } catch {}
   } catch (e: any) {
-    return { statusCode: 502, body: `Telegram error: ${e?.message || 'unknown'}` }
+    const msg = String(e?.message || '')
+    if (/reply message not found/i.test(msg) || /REPLY_MESSAGE_NOT_FOUND/i.test(msg)) {
+      return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'reply_not_found' }) }
+    }
+    return { statusCode: 502, body: `Telegram error: ${msg || 'unknown'}` }
   }
 
   const ts = Math.floor(Date.now() / 1000)

@@ -39,6 +39,11 @@ export default function App() {
   const [text, setText] = useState('')
   const [captchaMode, setCaptchaMode] = useState<'turnstile' | 'hcaptcha' | 'none'>('turnstile')
   const widgetIdRef = useRef<any>(null)
+  // Captcha token lifecycle
+  const tokenVersionRef = useRef(0)
+  const lastUsedTokenVersionRef = useRef(-1)
+  const waitResolveRef = useRef<((t: string) => void) | null>(null)
+  const waitTimerRef = useRef<number | null>(null)
 
   const reset = useCallback(() => {
     setState('idle'); setError(null); setCaptchaToken(''); setText('')
@@ -52,7 +57,18 @@ export default function App() {
     if (!siteKey || !window.turnstile) return
     const id = window.turnstile.render('#cf-turnstile', {
       sitekey: siteKey,
-      callback: (token: string) => setCaptchaToken(token),
+      callback: (token: string) => {
+        setCaptchaToken(token)
+        tokenVersionRef.current += 1
+        if (waitResolveRef.current) {
+          waitResolveRef.current(token)
+          waitResolveRef.current = null
+          if (waitTimerRef.current) {
+            window.clearTimeout(waitTimerRef.current)
+            waitTimerRef.current = null
+          }
+        }
+      },
       'error-callback': () => setCaptchaToken('')
     })
     widgetIdRef.current = id
@@ -79,6 +95,25 @@ export default function App() {
     return () => clearInterval(id)
   }, [onLoadTurnstile])
 
+  async function requireCaptchaToken(): Promise<string> {
+    if (captchaMode === 'none') return ''
+    // if we already have a fresh token not yet used
+    if (captchaToken && tokenVersionRef.current > lastUsedTokenVersionRef.current) {
+      return captchaToken
+    }
+    // trigger a fresh token and wait for callback
+    const ts: any = (window as any).turnstile
+    if (!ts) throw new Error('Капча недоступна')
+    try { ts.reset(widgetIdRef.current) } catch {}
+    return await new Promise<string>((resolve, reject) => {
+      waitResolveRef.current = resolve
+      waitTimerRef.current = window.setTimeout(() => {
+        waitResolveRef.current = null
+        reject(new Error('Капча не подтверждена'))
+      }, 10000)
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -86,20 +121,13 @@ export default function App() {
       setError('Ошибка валидации')
       return
     }
-    let tokenToSend = captchaToken
-    if (captchaMode !== 'none' && (window as any).turnstile) {
-      const ts = (window as any).turnstile
-      // Always refresh to avoid timeout-or-duplicate
-      try { ts.reset(widgetIdRef.current) } catch {}
-      // wait for a fresh token
-      const start = Date.now()
-      tokenToSend = ''
-      while (!tokenToSend && Date.now() - start < 4000) {
-        await new Promise(r => setTimeout(r, 150))
-        try { tokenToSend = ts.getResponse(widgetIdRef.current) || '' } catch {}
-      }
+    let tokenToSend = ''
+    try {
+      tokenToSend = await requireCaptchaToken()
+    } catch (err: any) {
+      setError(err?.message || 'Подтвердите капчу')
+      return
     }
-    if (captchaMode !== 'none' && !tokenToSend) { setError('Подтвердите капчу'); return }
     setState('submitting')
     try {
       const fd = new FormData()
@@ -132,13 +160,14 @@ export default function App() {
         let j: any = null
         try { j = txt ? JSON.parse(txt) : null } catch {}
         if (j?.error === 'captcha_failed') {
-          if ((window as any).turnstile && widgetIdRef.current) {
-            try { (window as any).turnstile.reset(widgetIdRef.current) } catch {}
-          }
+          // mark old token as used and request a fresh token next time
+          lastUsedTokenVersionRef.current = tokenVersionRef.current
           throw new Error('Капча истекла, попробуйте ещё раз')
         }
         throw new Error(j ? JSON.stringify(j) : (txt || 'Ошибка отправки'))
       }
+      // mark token as used to force refresh next submit
+      lastUsedTokenVersionRef.current = tokenVersionRef.current
       setState('done')
     } catch (e: any) {
       setError(e?.message || 'Ошибка отправки')
@@ -219,24 +248,24 @@ export default function App() {
             {!!replyPreview && <button type="button" onClick={()=>setReplyOpen(v=>!v)} style={{ ...ghostBtn, padding: '8px 12px' }}>{replyOpen ? 'Свернуть цитату' : 'Показать цитату'}</button>}
             {replyInput && <button type="button" onClick={()=>{setReplyInput(''); setReplyPreview('')}} style={{ ...ghostBtn, borderColor: 'var(--border)', color: 'var(--muted)', padding: '8px 12px' }}>Очистить</button>}
           </div>
-          {replyPreview && replyOpen && (
-            <div style={{ marginTop: 10, borderLeft: '3px solid var(--accent)', paddingLeft: 12, color: 'var(--muted)' }}>
-              <div style={{ whiteSpace: 'pre-wrap' }}>{replyPreview.slice(0, 800)}</div>
+          {replyInput && (
+            <div style={{ marginTop: 10, borderLeft: '3px solid var(--accent)', paddingLeft: 12 }}>
+              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap' }}>
+                {replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}
+              </div>
             </div>
           )}
           <div style={label}>Сообщение</div>
           <textarea value={text} onChange={(e)=>setText(e.target.value)} placeholder="Напишите, что важно…" rows={8} style={textareaStyle} />
 
-          <div style={{ height: 16 }} />
-          <div style={label}>Вложение (необязательно)</div>
-          <div style={row}>
-            <button type="button" onClick={onPickFile} style={ghostBtn}>Прикрепить файл</button>
-            {fileRef.current?.files?.[0] && (
-              <span style={{ color: 'var(--muted)' }}>{fileRef.current.files[0].name}</span>
-            )}
-            {fileRef.current?.files?.[0] && (
-              <button type="button" onClick={clearFile} style={{ ...ghostBtn, borderColor: 'var(--border)', color: 'var(--muted)' }}>Убрать</button>
-            )}
+          <div style={{ height: 10 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <button type="button" onClick={onPickFile} title="Вложение" style={{...ghostBtn, padding: '10px', borderRadius: 12}}>📎</button>
+            <textarea value={text} onChange={(e)=>{setText(e.target.value); const t=e.target; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Напишите сообщение…" rows={3} style={{...textareaStyle, flex: 1, height: 56}} />
+            <button disabled={state==='submitting'} type="submit" style={primaryBtn}>
+              {state==='submitting' && <span style={{ width: 14, height: 14, border: '2px solid #0b0b0f', borderRightColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />}
+              {state === 'submitting' ? 'Отправка…' : state === 'done' ? 'Отправлено' : state === 'error' ? 'Повторить?' : 'Отправить'}
+            </button>
           </div>
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
 
@@ -250,14 +279,10 @@ export default function App() {
           )}
 
           <div style={{ height: 16 }} />
-          {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''}></div>}
+          {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
 
-          <div style={{ height: 16 }} />
+          <div style={{ height: 12 }} />
           <div style={row}>
-            <button disabled={state==='submitting'} type="submit" style={primaryBtn}>
-              {state==='submitting' && <span style={{ width: 14, height: 14, border: '2px solid #0b0b0f', borderRightColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />}
-              {state === 'submitting' ? 'Отправка…' : state === 'done' ? 'Отправлено' : state === 'error' ? 'Повторить?' : 'Отправить'}
-            </button>
             {state === 'done' && <span style={{ color: 'var(--ok)', fontWeight: 500 }}>Готово! Скоро появится в канале.</span>}
             {error && <span style={{ color: 'var(--error)' }}>{error}</span>}
           </div>
