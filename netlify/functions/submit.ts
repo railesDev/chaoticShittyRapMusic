@@ -94,22 +94,41 @@ async function tgApi(method: string, form?: FormData) {
   return j.result
 }
 
-async function editText(chatId: string, messageId: number, text: string) {
+async function getNumericChatId(): Promise<number> {
+  // If env already numeric, use it
+  const idStr = TELEGRAM_CHANNEL_ID.trim()
+  if (/^-?\d+$/.test(idStr)) return Number(idStr)
   const fd = new FormData()
-  fd.append('chat_id', chatId)
-  fd.append('message_id', String(messageId))
-  fd.append('text', text)
-  fd.append('parse_mode', 'HTML')
-  return tgApi('editMessageText', fd)
+  fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+  const chat = await tgApi('getChat', fd)
+  return chat.id as number
 }
 
-async function editCaption(chatId: string, messageId: number, caption: string) {
+async function computeNextCounter(): Promise<number> {
+  // Try to read last cu-N from recent updates for this bot in this channel
+  const chatIdNum = await getNumericChatId()
   const fd = new FormData()
-  fd.append('chat_id', chatId)
-  fd.append('message_id', String(messageId))
-  fd.append('caption', caption)
-  fd.append('parse_mode', 'HTML')
-  return tgApi('editMessageCaption', fd)
+  fd.append('limit', '100')
+  fd.append('timeout', '0')
+  fd.append('allowed_updates', JSON.stringify(['channel_post', 'edited_channel_post']))
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates`
+  const r = await fetch(url, { method: 'POST', body: fd })
+  let last = 0
+  try {
+    const j = await r.json()
+    if (j.ok && Array.isArray(j.result)) {
+      for (let i = j.result.length - 1; i >= 0; i--) {
+        const u = j.result[i]
+        const msg = (u.channel_post || u.edited_channel_post)
+        if (msg && msg.chat && msg.chat.id === chatIdNum) {
+          const text = (msg.caption || msg.text || '') as string
+          const m = text.match(/\bcu-(\d+)\b/i)
+          if (m) { last = Math.max(last, parseInt(m[1], 10)); if (last) break }
+        }
+      }
+    }
+  } catch {}
+  return last + 1 || 1
 }
 
 const handler: Handler = async (event) => {
@@ -236,56 +255,43 @@ const handler: Handler = async (event) => {
   }
 
   const captionBase = sanitize(text)
+  const cuNumber = await computeNextCounter()
+  const finalPrefix = `cu-${cuNumber}`
 
   try {
     if (content) {
       const fd = new FormData()
       if (mime?.startsWith('image/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        if (captionBase) fd.append('caption', captionBase)
+        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
         fd.append('parse_mode', 'HTML')
         fd.append('photo', new Blob([content], { type: mime }), filename || 'image')
-        const sent = await tgApi('sendPhoto', fd)
-        const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await tgApi('sendPhoto', fd)
       } else if (mime?.startsWith('audio/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        if (captionBase) fd.append('caption', captionBase)
+        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
         fd.append('parse_mode', 'HTML')
         fd.append('audio', new Blob([content], { type: mime }), filename || 'audio')
-        const sent = await tgApi('sendAudio', fd)
-        const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await tgApi('sendAudio', fd)
       } else if (mime?.startsWith('video/')) {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        if (captionBase) fd.append('caption', captionBase)
+        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
         fd.append('parse_mode', 'HTML')
         fd.append('video', new Blob([content], { type: mime }), filename || 'video')
-        const sent = await tgApi('sendVideo', fd)
-        const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await tgApi('sendVideo', fd)
       } else {
         fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-        if (captionBase) fd.append('caption', captionBase)
+        fd.append('caption', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
         fd.append('parse_mode', 'HTML')
         fd.append('document', new Blob([content], { type: mime || 'application/octet-stream' }), filename || 'file')
-        const sent = await tgApi('sendDocument', fd)
-        const id = sent.message_id as number
-        const finalCaption = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await tgApi('sendDocument', fd)
       }
     } else {
       const fd = new FormData()
       fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-      fd.append('text', captionBase || '...')
+      fd.append('text', captionBase ? `${finalPrefix}\n\n${captionBase}` : `${finalPrefix}`)
       fd.append('parse_mode', 'HTML')
-      const sent = await tgApi('sendMessage', fd)
-      const id = sent.message_id as number
-      const finalText = captionBase ? `cu-${id}\n\n${captionBase}` : `cu-${id}`
-      await editText(TELEGRAM_CHANNEL_ID, id, finalText)
+      await tgApi('sendMessage', fd)
     }
   } catch (e: any) {
     return { statusCode: 502, body: `Telegram error: ${e?.message || 'unknown'}` }

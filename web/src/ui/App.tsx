@@ -123,17 +123,24 @@ export default function App() {
     }
   }
 
+  React.useEffect(() => {
+    if (state === 'done' || state === 'error') {
+      const t = setTimeout(() => setState('idle'), 10000)
+      return () => clearTimeout(t)
+    }
+  }, [state])
+
   // Styles
   const container: React.CSSProperties = { maxWidth: 800, margin: '48px auto', padding: 24 }
-  const title: React.CSSProperties = { fontSize: 44, fontWeight: 800, margin: '0 0 8px', letterSpacing: -0.5 }
-  const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18 }
+  const title: React.CSSProperties = { fontSize: 44, fontWeight: 500, margin: '0 0 8px', letterSpacing: -0.5 }
+  const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18, fontWeight: 500 }
   const card: React.CSSProperties = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginTop: 24 }
-  const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 600 }
-  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16 }
+  const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }
+  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 12, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
-  const primaryBtn: React.CSSProperties = { padding: '12px 18px', borderRadius: 999, border: '1px solid var(--accent)', background: 'var(--accent)', color: '#0b0b0f', fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer', boxShadow: '0 6px 24px rgba(124,92,255,0.35)' }
-  const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer' }
-  const chip: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, background: 'rgba(124,92,255,0.15)', color: 'var(--accent-2)', fontWeight: 700, display: 'inline-block' }
+  const primaryBtn: React.CSSProperties = { padding: '12px 18px', borderRadius: 999, border: '1px solid var(--accent)', background: 'var(--accent)', color: '#0b0b0f', fontWeight: 500, letterSpacing: 0.2, cursor: 'pointer', boxShadow: '0 6px 24px rgba(124,92,255,0.35)', display: 'inline-flex', alignItems: 'center', gap: 8 }
+  const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }
+  const chip: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, background: 'rgba(124,92,255,0.15)', color: 'var(--accent-2)', fontWeight: 500, display: 'inline-block' }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
@@ -158,8 +165,8 @@ export default function App() {
     <div style={container}>
       <div>
         <div style={chip}>CU Pulse</div>
-        <h1 style={title}>Анонимная отправка</h1>
-        <p style={subtitle}>Текст + опциональное вложение (картинка, аудио, видео или файл). Включена автоматическая модерация на сервере.</p>
+        <h1 style={title}>Отправить сообщение</h1>
+        <p style={subtitle}>Поддерживаются любые вложения. Работает модерация.</p>
       </div>
 
       <div style={card}>
@@ -194,8 +201,11 @@ export default function App() {
 
           <div style={{ height: 16 }} />
           <div style={row}>
-            <button disabled={state==='submitting'} type="submit" style={primaryBtn}>{state==='submitting' ? 'Отправка…' : 'Отправить'}</button>
-            {state === 'done' && <span style={{ color: 'var(--ok)', fontWeight: 600 }}>Отправлено! Скоро появится в канале.</span>}
+            <button disabled={state==='submitting'} type="submit" style={primaryBtn}>
+              {state==='submitting' && <span style={{ width: 14, height: 14, border: '2px solid #0b0b0f', borderRightColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />}
+              {state === 'submitting' ? 'Отправка…' : state === 'done' ? 'Отправлено' : state === 'error' ? 'Повторить?' : 'Отправить'}
+            </button>
+            {state === 'done' && <span style={{ color: 'var(--ok)', fontWeight: 500 }}>Готово! Скоро появится в канале.</span>}
             {error && <span style={{ color: 'var(--error)' }}>{error}</span>}
           </div>
 
