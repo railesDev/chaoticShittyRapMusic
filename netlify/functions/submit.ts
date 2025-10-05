@@ -117,7 +117,7 @@ const handler: Handler = async (event) => {
   // decode obfuscated fields mapping
   let fieldsMap: Record<string, string> = {}
   try {
-    const mRaw = parsed.fields?.m
+    const mRaw = (parsed.fields && parsed.fields.m) || (parsed as any)['m']
     if (typeof mRaw === 'string' && mRaw) {
       fieldsMap = JSON.parse(Buffer.from(mRaw, 'base64').toString('utf8'))
     }
@@ -127,17 +127,20 @@ const handler: Handler = async (event) => {
 
   function getField(name: string) {
     const key = fieldsMap[name]
-    const v = key ? parsed.fields[key] : undefined
+    const v = key ? parsed.fields[key] : (parsed.fields ? parsed.fields[name] : undefined)
     if (v !== undefined) return v
     // Fallbacks for robustness
     if (name === 'token') {
       return (
-        (parsed.fields['token'] as string | undefined) ||
-        (parsed.fields['cf-turnstile-response'] as string | undefined) ||
-        (parsed.fields['h-captcha-response'] as string | undefined)
+        (parsed.fields && (parsed.fields['token'] as string | undefined)) ||
+        (parsed.fields && (parsed.fields['cf-turnstile-response'] as string | undefined)) ||
+        (parsed.fields && (parsed.fields['h-captcha-response'] as string | undefined)) ||
+        (parsed as any)['token'] ||
+        (parsed as any)['cf-turnstile-response'] ||
+        (parsed as any)['h-captcha-response']
       )
     }
-    return parsed.fields[name]
+    return (parsed as any)[name]
   }
 
   const token = getField('token') as string | undefined
@@ -145,6 +148,23 @@ const handler: Handler = async (event) => {
   const honeypot = getField('honeypot')
 
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
+  if (DEBUG) {
+    const keys = new Set<string>()
+    if (parsed && typeof parsed === 'object') {
+      Object.keys(parsed).forEach(k => keys.add(k))
+    }
+    if (parsed.fields && typeof parsed.fields === 'object') {
+      Object.keys(parsed.fields).forEach(k => keys.add('fields.' + k))
+    }
+    console.log('Form keys:', Array.from(keys))
+    console.log('Token candidates:', {
+      direct: (parsed as any)['token']?.toString?.().slice(0, 10),
+      directCF: (parsed as any)['cf-turnstile-response']?.toString?.().slice(0, 10),
+      fToken: parsed.fields && (parsed.fields['token'] as any)?.toString?.().slice(0, 10),
+      fCF: parsed.fields && (parsed.fields['cf-turnstile-response'] as any)?.toString?.().slice(0, 10)
+    })
+  }
+
   const captcha = await verifyCaptcha(token)
   if (!captcha.ok) {
     if (DEBUG) {
