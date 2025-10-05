@@ -310,6 +310,18 @@ export default function App() {
 
       <div style={composerWrap}>
         <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
+          <div style={{ marginBottom: 8 }}>
+            <div style={label}>Ответить на</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--muted)' }}>
+              <Reply size={24} color={'var(--accent)'} />
+              <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
+            </div>
+            {replyInput && (
+              <div style={{ marginTop: 12, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+                <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+              </div>
+            )}
+          </div>
 
           {previewUrl && (
             <div style={{ margin: '8px 0' }}>
@@ -366,10 +378,6 @@ export default function App() {
             <button type="button" onClick={onPickFile} title="Вложение" style={iconBtnPlain}>
               <Paperclip size={22} />
             </button>
-            <div style={{ display:'flex', alignItems:'center', gap: 8, color:'var(--muted)' }}>
-              <Reply size={20} color={'var(--accent)'} />
-              <input id="reply-input" value={replyInput} onChange={e=>setReplyInput(e.target.value)} placeholder="cu-XXX" style={replyInputStyle} />
-            </div>
             <div
               className="composer-editable"
               ref={taRef as any}
@@ -403,11 +411,7 @@ export default function App() {
               )}
             </button>
           </div>
-          {replyInput && (
-            <div style={{ marginTop: 8, borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
-              <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
-            </div>
-          )}
+          
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
