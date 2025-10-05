@@ -131,6 +131,38 @@ async function computeNextCounter(): Promise<number> {
   return last + 1 || 1
 }
 
+async function getChatInfo(): Promise<any> {
+  const fd = new FormData()
+  fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+  return tgApi('getChat', fd)
+}
+
+function extractCounterFromDesc(desc: string | undefined): number {
+  if (!desc) return 0
+  const m1 = desc.match(/\bcu-\s*(\d+)\b/i)
+  if (m1) return parseInt(m1[1], 10)
+  const m2 = desc.match(/\bcu:\s*(\d+)\b/i)
+  if (m2) return parseInt(m2[1], 10)
+  return 0
+}
+
+function upsertCounterInDesc(desc: string | undefined, n: number): string {
+  let base = (desc || '').trim()
+  if (!base) return `cu: ${n}`
+  if (/\bcu:\s*\d+\b/i.test(base)) {
+    return base.replace(/\bcu:\s*\d+\b/i, `cu: ${n}`)
+  }
+  if (/\bcu-\s*\d+\b/i.test(base)) {
+    return base.replace(/\bcu-\s*\d+\b/i, `cu: ${n}`)
+  }
+  const suffix = ` • cu: ${n}`
+  const limit = 255
+  if (base.length + suffix.length > limit) {
+    base = base.slice(0, limit - suffix.length - 1).trimEnd()
+  }
+  return base + suffix
+}
+
 const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
@@ -262,7 +294,16 @@ const handler: Handler = async (event) => {
   }
 
   const captionBase = sanitize(text)
-  const cuNumber = await computeNextCounter()
+  // Determine counter: try updates, else channel description
+  let cuNumber = await computeNextCounter()
+  if (!cuNumber || cuNumber < 1) {
+    try {
+      const chat = await getChatInfo()
+      const fromDesc = extractCounterFromDesc(chat?.description)
+      cuNumber = (fromDesc || 0) + 1
+      if (!cuNumber) cuNumber = 1
+    } catch {}
+  }
   const finalPrefix = `cu-${cuNumber}`
 
   try {
@@ -300,6 +341,16 @@ const handler: Handler = async (event) => {
       fd.append('parse_mode', 'HTML')
       await tgApi('sendMessage', fd)
     }
+
+    // Persist last counter in channel description (best-effort)
+    try {
+      const chat = await getChatInfo()
+      const newDesc = upsertCounterInDesc(chat?.description, cuNumber)
+      const fdDesc = new FormData()
+      fdDesc.append('chat_id', TELEGRAM_CHANNEL_ID)
+      fdDesc.append('description', newDesc)
+      await tgApi('setChatDescription', fdDesc)
+    } catch {}
   } catch (e: any) {
     return { statusCode: 502, body: `Telegram error: ${e?.message || 'unknown'}` }
   }
