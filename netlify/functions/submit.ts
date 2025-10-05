@@ -314,7 +314,7 @@ const handler: Handler = async (event) => {
         fd.append('photo', new Blob([content], { type: mime }), filename || 'image')
         const sent = await tgApi('sendPhoto', fd)
         const id = sent.message_id as number
-        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
@@ -326,7 +326,7 @@ const handler: Handler = async (event) => {
         fd.append('audio', new Blob([content], { type: mime }), filename || 'audio')
         const sent = await tgApi('sendAudio', fd)
         const id = sent.message_id as number
-        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
@@ -338,7 +338,7 @@ const handler: Handler = async (event) => {
         fd.append('video', new Blob([content], { type: mime }), filename || 'video')
         const sent = await tgApi('sendVideo', fd)
         const id = sent.message_id as number
-        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
@@ -350,7 +350,7 @@ const handler: Handler = async (event) => {
         fd.append('document', new Blob([content], { type: mime || 'application/octet-stream' }), filename || 'file')
         const sent = await tgApi('sendDocument', fd)
         const id = sent.message_id as number
-        const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+        const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
         await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
@@ -363,7 +363,7 @@ const handler: Handler = async (event) => {
       if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
       const sent = await tgApi('sendMessage', fd)
       const id = sent.message_id as number
-      const warning = isFlagged ? `\n⚠️Пост не прошел модерацию\n` : ''
+      const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
       const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
       const finalText = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
       await editText(TELEGRAM_CHANNEL_ID, id, finalText)
