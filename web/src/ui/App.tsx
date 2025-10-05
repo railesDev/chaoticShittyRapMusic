@@ -39,7 +39,7 @@ export default function App() {
   const hpRef = useRef<HTMLInputElement | null>(null)
   const [text, setText] = useState('')
   const taRef = useRef<HTMLTextAreaElement | null>(null)
-  const [isMultiLine, setIsMultiLine] = useState(false)
+  const [padTop, setPadTop] = useState(0)
   const [captchaMode, setCaptchaMode] = useState<'turnstile' | 'hcaptcha' | 'none'>('turnstile')
   const widgetIdRef = useRef<any>(null)
   // Captcha token lifecycle
@@ -385,9 +385,16 @@ export default function App() {
                 setText(e.target.value)
                 const t=e.target as HTMLTextAreaElement
                 t.style.height = 'auto'
-                const sc = Math.max(40, Math.min(140, t.scrollHeight))
-                setIsMultiLine(sc > 44)
-                t.style.height = sc + 'px'
+                const SINGLE = 40
+                const MAX = 140
+                const sc = Math.min(MAX, t.scrollHeight)
+                if (sc <= SINGLE + 2) {
+                  t.style.height = SINGLE + 'px'
+                  setPadTop(SINGLE - 20 - 6)
+                } else {
+                  t.style.height = sc + 'px'
+                  setPadTop(sc - 20 - 6)
+                }
               }}
               placeholder="Поделись тем, что важно"
               rows={2}
@@ -396,9 +403,9 @@ export default function App() {
                 flex: 1,
                 height: 40,
                 borderRadius: 28,
-                lineHeight: isMultiLine ? '20px' : '40px',
-                paddingTop: isMultiLine ? 4 : 0,
-                paddingBottom: isMultiLine ? 6 : 0,
+                lineHeight: '20px',
+                paddingTop: padTop,
+                paddingBottom: 6,
                 alignSelf: 'flex-end'
               }}
             />
