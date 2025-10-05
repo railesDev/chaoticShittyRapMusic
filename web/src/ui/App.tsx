@@ -97,6 +97,8 @@ export default function App() {
       fd.set(fields.get('text')!, text)
       fd.set(fields.get('token')!, tokenToSend || '')
       fd.set(fields.get('honeypot')!, hpRef.current?.value || '')
+      // Plain fallbacks for robustness
+      fd.set('text', text)
       // Add non-obfuscated fallbacks to improve compatibility
       if (tokenToSend) {
         fd.set('token', tokenToSend)
@@ -115,7 +117,20 @@ export default function App() {
         headers,
         credentials: 'include'
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        try {
+          const j = await res.json()
+          if (j?.error === 'captcha_failed') {
+            if ((window as any).turnstile && widgetIdRef.current) {
+              try { (window as any).turnstile.reset(widgetIdRef.current) } catch {}
+            }
+            throw new Error('Капча истекла, попробуйте ещё раз')
+          }
+          throw new Error(JSON.stringify(j))
+        } catch {
+          throw new Error(await res.text())
+        }
+      }
       setState('done')
     } catch (e: any) {
       setError(e?.message || 'Ошибка отправки')

@@ -183,7 +183,7 @@ const handler: Handler = async (event) => {
   }
 
   const token = getField('token') as string | undefined
-  const text = String(getField('text') || '').trim()
+  let text = String(getField('text') || '').trim()
   const honeypot = getField('honeypot')
 
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
@@ -227,6 +227,13 @@ const handler: Handler = async (event) => {
 
   const reason = basicModeration(text)
   if (reason) return { statusCode: 400, body: reason }
+  // Make sure we keep user's text; if empty, try top-level again or fallback to filename
+  if (!text) {
+    if (parsed && typeof parsed === 'object') {
+      const direct = (parsed as any)['text']
+      if (typeof direct === 'string' && direct.trim()) text = direct.trim()
+    }
+  }
 
   // Handle file (single optional)
   const file = (parsed.files || [])[0]
