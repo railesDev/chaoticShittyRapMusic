@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Paperclip, Send, Reply, Trash2 } from 'lucide-react'
+import { Paperclip, Send, Reply, Trash2, Pause, Play } from 'lucide-react'
 
 type SubmitState = 'idle' | 'submitting' | 'done' | 'error'
 
@@ -186,22 +186,25 @@ export default function App() {
   // Styles
   const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px' }
   const headerWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)', padding: '20px 0 12px' }
-  const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 500, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
+  const title: React.CSSProperties = { fontSize: 'clamp(32px, 6vw, 56px)', fontWeight: 600, margin: '8px 0 6px', letterSpacing: -0.5, lineHeight: 1.05 }
   const subtitle: React.CSSProperties = { color: 'var(--muted)', margin: 0, fontSize: 18, fontWeight: 500 }
-  const contentWrap: React.CSSProperties = { paddingTop: 8, paddingBottom: 120, minHeight: 'calc(100vh - 180px)' }
+  const contentWrap: React.CSSProperties = { paddingTop: 8, paddingBottom: 180, minHeight: 'calc(100vh - 180px)' }
   const composerWrap: React.CSSProperties = { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, background: 'var(--bg)', padding: '8px 12px calc(8px + env(safe-area-inset-bottom))' }
-  const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 10, alignItems: 'flex-end' }
+  const composerInner: React.CSSProperties = { maxWidth: 900, margin: '0 auto', display: 'flex', gap: 12, flexDirection: 'column' }
   const label: React.CSSProperties = { color: 'var(--muted)', marginBottom: 8, fontWeight: 500 }
-  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 16, border: '1px solid var(--border)', background: '#0f0f14', color: 'var(--text)', outline: 'none', fontSize: 16, resize: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  const textareaStyle: React.CSSProperties = { width: '100%', padding: 16, borderRadius: 20, border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', fontSize: 18, resize: 'none' }
   const row: React.CSSProperties = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
-  const primaryBtn: React.CSSProperties = { width: 52, height: 52, borderRadius: 18, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
-  const ghostBtn: React.CSSProperties = { padding: '10px 14px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }
-  const attachBtn: React.CSSProperties = { width: 52, height: 52, borderRadius: 18, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center' }
-  const chip: React.CSSProperties = { padding: '6px 12px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 500, display: 'inline-block' }
-  const replyInputStyle: React.CSSProperties = { flex: '0 0 260px', padding: '12px 16px', borderRadius: 18, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 20 }
+  const chip: React.CSSProperties = { padding: '8px 14px', borderRadius: 999, background: '#BBE3E6', color: '#0b0b0f', fontWeight: 600, display: 'inline-block' }
+  const composerBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, borderRadius: 28, border: '1px solid var(--border)', background: '#0f0f14', padding: '8px 12px 8px 12px', boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset' }
+  const roundIconBtn: React.CSSProperties = { width: 44, height: 44, borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
+  const replyInputStyle: React.CSSProperties = { flex: '0 0 260px', padding: '10px 14px', borderRadius: 16, border: 'none', background: '#0f0f14', color: 'var(--text)', outline: 'none', boxShadow: '0 0 0 1px rgba(255,255,255,0.06) inset', fontSize: 20 }
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewKind, setPreviewKind] = useState<'image'|'audio'|'video'|'file'|null>(null)
+  const [audioMeta, setAudioMeta] = useState<{name: string; duration: number} | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [audioPlaying, setAudioPlaying] = useState(false)
+  const [audioTime, setAudioTime] = useState(0)
   const [replyInput, setReplyInput] = useState('')
   const [replyPreview, setReplyPreview] = useState<string>('')
   const [replyOpen, setReplyOpen] = useState(true)
@@ -209,17 +212,20 @@ export default function App() {
   const onPickFile = useCallback(() => fileRef.current?.click(), [])
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (!f) { setPreviewUrl(null); setPreviewKind(null); return }
+    if (!f) { setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null); return }
     if (f.type.startsWith('video/')) { alert('Видео не поддерживается'); if (fileRef.current) fileRef.current.value=''; return }
     const url = URL.createObjectURL(f)
     setPreviewUrl(url)
     if (f.type.startsWith('image/')) setPreviewKind('image')
-    else if (f.type.startsWith('audio/')) setPreviewKind('audio')
+    else if (f.type.startsWith('audio/')) {
+      setPreviewKind('audio')
+      setAudioMeta({ name: f.name.replace(/\.[^.]+$/, ''), duration: 0 })
+    }
     else setPreviewKind('file')
   }, [])
   const clearFile = useCallback(() => {
     if (fileRef.current) fileRef.current.value = ''
-    setPreviewUrl(null); setPreviewKind(null)
+    setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null); setAudioPlaying(false); setAudioTime(0)
   }, [])
 
   React.useEffect(() => {
@@ -238,6 +244,18 @@ export default function App() {
     return () => ctrl.abort()
   }, [replyInput])
 
+  function formatTime(total: number) {
+    if (!Number.isFinite(total) || total <= 0) return '00:00'
+    const m = Math.floor(total / 60)
+    const s = Math.floor(total % 60)
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  }
+
+  function progressPct(current: number, total?: number) {
+    if (!total || total <= 0) return 0
+    return Math.min(100, Math.max(0, (current / total) * 100))
+  }
+
   return (
     <div style={container}>
       <div style={headerWrap}>
@@ -248,13 +266,52 @@ export default function App() {
 
       <div style={contentWrap}>
         {previewUrl && (
-          <div style={{ marginTop: 16, position: 'relative' }}>
-            {previewKind === 'image' && <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 18, border: '1px solid var(--border)' }} />}
-            {previewKind === 'audio' && <audio controls src={previewUrl} style={{ width: '100%' }} />}
-            {previewKind === 'file' && <div style={{ color: 'var(--muted)' }}>Файл готов к отправке</div>}
-            <button type="button" onClick={clearFile} title="Удалить" style={{ position: 'absolute', right: 8, bottom: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', borderRadius: 12, padding: 8, color: 'var(--accent)' }}>
-              <Trash2 size={18} />
-            </button>
+          <div style={{ marginTop: 16 }}>
+            {previewKind === 'image' && (
+              <div style={{ position: 'relative' }}>
+                <img src={previewUrl} alt="preview" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 20, border: '1px solid var(--border)' }} />
+                <button type="button" onClick={clearFile} title="Удалить" style={{ position: 'absolute', right: 10, bottom: 10, width: 40, height: 40, borderRadius: 12, background: 'rgba(0,0,0,0.55)', border: '1px solid var(--border)', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            )}
+            {previewKind === 'audio' && (
+              <div style={{ position: 'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button type="button" aria-label={audioPlaying ? 'Пауза' : 'Воспроизвести'} onClick={() => {
+                    const a = audioRef.current
+                    if (!a) return
+                    if (audioPlaying) { a.pause(); setAudioPlaying(false) } else { a.play().catch(()=>{}); setAudioPlaying(true) }
+                  }} style={{ width: 44, height: 44, borderRadius: 999, border: '1px solid var(--accent)', color: 'var(--accent)', background: 'transparent', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                    {audioPlaying ? <Pause size={22}/> : <Play size={22}/>}
+                  </button>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8 }}>
+                      <div style={{ color: 'var(--text)', fontWeight: 500, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{audioMeta?.name || 'Аудио'}</div>
+                      <div style={{ color: 'var(--muted)', flex: '0 0 auto' }}>{formatTime(audioMeta?.duration || 0)}</div>
+                    </div>
+                    <div style={{ position: 'relative', height: 4, marginTop: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
+                      <div style={{ position:'absolute', left: 0, top:0, bottom:0, width: `${progressPct(audioTime, audioMeta?.duration)}%`, background: 'var(--accent)', borderRadius: 999 }} />
+                    </div>
+                  </div>
+                  <button type="button" onClick={clearFile} title="Удалить" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+                <audio ref={audioRef} src={previewUrl} style={{ display:'none' }} onLoadedMetadata={(e) => {
+                  const a = e.currentTarget
+                  setAudioMeta(m => ({ name: m?.name || 'Аудио', duration: a.duration || 0 }))
+                }} onTimeUpdate={(e) => setAudioTime(e.currentTarget.currentTime)} onEnded={() => { setAudioPlaying(false); setAudioTime(0) }} />
+              </div>
+            )}
+            {previewKind === 'file' && (
+              <div style={{ position: 'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 16, color: 'var(--muted)' }}>
+                Файл готов к отправке
+                <button type="button" onClick={clearFile} title="Удалить" style={{ position:'absolute', right: 10, bottom: 10, width: 40, height: 40, borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', color: 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -274,11 +331,15 @@ export default function App() {
           </div>
 
         <form onSubmit={handleSubmit} style={composerInner}>
-          <button type="button" onClick={onPickFile} title="Вложение" style={attachBtn}><Paperclip size={20} /></button>
-          <textarea value={text} onChange={(e)=>{setText(e.target.value); const t=e.target as HTMLTextAreaElement; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Поделись тем, что важно" rows={2} style={{...textareaStyle, flex: 1, height: 56, borderRadius: 24 }} />
-          <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={primaryBtn}>
-            {state==='submitting' ? (<span style={{ width: 18, height: 18, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />) : (<Send size={22} />)}
-          </button>
+          <div style={composerBox}>
+            <button type="button" onClick={onPickFile} title="Вложение" style={{ ...roundIconBtn, width: 42, height: 42 }}>
+              <Paperclip size={20} />
+            </button>
+            <textarea className="composer-textarea" value={text} onChange={(e)=>{setText(e.target.value); const t=e.target as HTMLTextAreaElement; t.style.height='auto'; t.style.height=Math.min(160, t.scrollHeight)+"px"}} placeholder="Поделись тем, что важно" rows={2} style={{...textareaStyle, flex: 1, height: 52}} />
+            <button aria-label="Отправить" disabled={state==='submitting'} type="submit" style={{ ...roundIconBtn, width: 48, height: 48 }}>
+              {state==='submitting' ? (<span style={{ width: 18, height: 18, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />) : (<Send size={22} />)}
+            </button>
+          </div>
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
