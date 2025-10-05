@@ -95,11 +95,11 @@ async function aiModerate(inputText: string | undefined, image?: ImageForModerat
     const inputs: any[] = []
     const text = (inputText || '').trim()
     if (text) {
-      inputs.push({ type: 'input_text', text })
+      inputs.push({ type: 'text', text })
     }
     if (image && image.mime.startsWith('image/')) {
       const dataUrl = `data:${image.mime};base64,${image.data.toString('base64')}`
-      inputs.push({ type: 'input_image', image_url: { url: dataUrl } })
+      inputs.push({ type: 'image_url', image_url: { url: dataUrl } })
     }
 
     if (inputs.length === 0) return { flagged: false }
@@ -107,7 +107,7 @@ async function aiModerate(inputText: string | undefined, image?: ImageForModerat
     // Prefer the Moderations API if possible
     const res: any = await client.moderations.create({
       model: 'omni-moderation-latest',
-      input: inputs.length === 1 && typeof inputs[0] === 'string' ? inputs[0] : inputs as any
+      input: inputs as any
     })
 
     // Combine flags across results
