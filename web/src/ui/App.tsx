@@ -218,7 +218,7 @@ export default function App() {
   }, [state])
 
   // Styles
-  const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', height: '100svh', overflow: 'hidden', position: 'relative' }
+  const container: React.CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '0 16px', height: '100dvh', overflow: 'hidden', position: 'relative' }
   const HEADER_H = 56
   const FOOTER_SPACE = 180
   const headerWrap: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, height: HEADER_H, zIndex: 20, background: 'var(--bg)', display: 'flex', alignItems: 'center' }

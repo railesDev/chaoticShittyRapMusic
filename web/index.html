@@ -2,7 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>CU Pulse</title>
     <meta name="theme-color" content="#0b0b0f" />
     <link rel="icon" href="/favicon.svg" />
@@ -30,7 +30,8 @@
         overflow: hidden;
       }
       * { box-sizing: border-box; }
-      #root { height: 100dvh; }
+      #root { height: 100dvh; position: fixed; inset: 0; overflow: hidden; }
+      html, body { overscroll-behavior-y: none; overscroll-behavior-x: none; }
       input, textarea, button { font-family: inherit; font-size: inherit; }
       #reply-input::placeholder { color: var(--muted); opacity: 1; }
       .composer-textarea::placeholder { color: var(--muted); opacity: .9; }
