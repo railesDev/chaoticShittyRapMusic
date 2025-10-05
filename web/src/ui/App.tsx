@@ -107,9 +107,12 @@ export default function App() {
       // Wrap fields map (light obfuscation)
       fd.set('m', btoa(JSON.stringify(Object.fromEntries(fields))))
 
+      const headers: Record<string, string> = {}
+      if (tokenToSend) headers['X-Turnstile-Token'] = tokenToSend
       const res = await fetch(`${API_BASE}/submit`, {
         method: 'POST',
         body: fd,
+        headers,
         credentials: 'include'
       })
       if (!res.ok) throw new Error(await res.text())

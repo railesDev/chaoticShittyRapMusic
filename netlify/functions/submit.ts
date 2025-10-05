@@ -137,7 +137,9 @@ const handler: Handler = async (event) => {
         (parsed.fields && (parsed.fields['h-captcha-response'] as string | undefined)) ||
         (parsed as any)['token'] ||
         (parsed as any)['cf-turnstile-response'] ||
-        (parsed as any)['h-captcha-response']
+        (parsed as any)['h-captcha-response'] ||
+        // also accept via header override
+        (event.headers && (event.headers['x-turnstile-token'] || (event.headers as any)['X-Turnstile-Token']))
       )
     }
     return (parsed as any)[name]
