@@ -258,12 +258,14 @@ const handler: Handler = async (event) => {
 
   const captcha = await verifyCaptcha(token)
   if (!captcha.ok) {
-    // Always return JSON so frontend can reliably show a proper tip
-    return {
-      statusCode: 400,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ error: 'captcha_failed', mode: CAPTCHA_MODE, debug: DEBUG ? captcha : undefined })
+    if (DEBUG) {
+      return {
+        statusCode: 400,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ error: 'captcha_failed', mode: CAPTCHA_MODE, debug: captcha })
+      }
     }
+    return { statusCode: 400, body: 'Captcha failed' }
   }
 
   const cookie = event.headers.cookie || ''
@@ -311,14 +313,12 @@ const handler: Handler = async (event) => {
     const modInput = [question, ...options].join('\n')
     const moderation = await aiModerate(modInput)
     const isFlagged = !!moderation.flagged
-    if (isFlagged) {
-      return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'moderation_blocked' }) }
-    }
 
     try {
       const fd = new FormData()
       fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-      fd.append('question', sanitize(question))
+      const questionFinal = isFlagged ? `! ${question}` : question
+      fd.append('question', sanitize(questionFinal))
       fd.append('options', JSON.stringify(options))
       fd.append('is_anonymous', 'true')
       if (allowsMultiple) fd.append('allows_multiple_answers', 'true')

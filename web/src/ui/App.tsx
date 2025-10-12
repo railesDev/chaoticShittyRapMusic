@@ -309,10 +309,7 @@ export default function App() {
           setErrorTip('Сообщение для ответа не найдено')
           setTimeout(() => setErrorTip(''), 2000)
         }
-        if (j?.error === 'moderation_blocked') {
-          setErrorTip('Пост не прошел модерацию')
-          setTimeout(() => setErrorTip(''), 2200)
-        }
+        // no-op: polls are now sent with a warning mark instead of blocking
         if (!j) {
           setErrorTip('Ошибка, попробуй позже')
           setTimeout(() => setErrorTip(''), 2000)
@@ -336,6 +333,7 @@ export default function App() {
         setPollQuestion('')
         setPollOptions(['', ''])
         setPollMulti(false)
+        setShowAttachMenu(false)
       }
       setState('done')
       setSendState('success')
