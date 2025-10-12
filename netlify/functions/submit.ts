@@ -173,7 +173,9 @@ const handler: Handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID || !SIGNING_SECRET) {
+  // Enforce numeric channel ID only (no usernames); prevent any implicit defaults
+  const isNumericChatId = /^-?\d+$/.test(TELEGRAM_CHANNEL_ID)
+  if (!TELEGRAM_BOT_TOKEN || !SIGNING_SECRET || !isNumericChatId) {
     return { statusCode: 500, body: 'Server not configured' }
   }
 

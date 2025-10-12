@@ -19,7 +19,7 @@ Simple, production‑ready anonymous submission channel hosted 100% on Netlify:
    - Functions: `netlify/functions` (bundler esbuild, Node 20)
 3) Set Site Environment variables:
    - `TELEGRAM_BOT_TOKEN` — from @BotFather
-   - `TELEGRAM_CHANNEL_ID` — `@channel_username` or numeric ID (bot must be admin)
+   - `TELEGRAM_CHANNEL_ID` — numeric channel ID only (e.g. `-1001234567890`; bot must be admin)
    - `SIGNING_SECRET` — random string for cookie signing
    - `CAPTCHA_MODE` — `none` to start, later `turnstile` or `hcaptcha`
    - For Turnstile (optional): `TURNSTILE_SITE_KEY` (public), `TURNSTILE_SECRET` (secret)
