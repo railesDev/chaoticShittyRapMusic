@@ -324,7 +324,8 @@ export default function App() {
       setReplyPreview('')
       try {
         const el = taRef.current as unknown as HTMLDivElement | null
-        if (el) el.innerText = ''
+        // Only clear innerText for text mode; in poll mode React owns children
+        if (composeKind === 'post' && el) el.innerText = ''
       } catch {}
       if (fileRef.current) fileRef.current.value = ''
       setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)

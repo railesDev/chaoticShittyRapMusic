@@ -317,7 +317,7 @@ const handler: Handler = async (event) => {
     try {
       const fd = new FormData()
       fd.append('chat_id', TELEGRAM_CHANNEL_ID)
-      const questionFinal = isFlagged ? `! ${question}` : question
+      const questionFinal = isFlagged ? `⚠️ ${question}` : question
       fd.append('question', sanitize(questionFinal))
       fd.append('options', JSON.stringify(options))
       fd.append('is_anonymous', 'true')
