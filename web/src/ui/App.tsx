@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Paperclip, Send, Reply, Trash2, Pause, Play, Check } from 'lucide-react'
+import { Paperclip, Send, Reply, Trash2, Pause, Play, Check, ListChecks, Image as ImageIcon, Plus } from 'lucide-react'
 
 type SubmitState = 'idle' | 'submitting' | 'done' | 'error'
 
@@ -17,6 +17,10 @@ function buildFields() {
   map.set('token', randomKey())
   map.set('honeypot', randomKey())
   map.set('file', randomKey())
+  // Poll fields
+  map.set('poll_question', randomKey())
+  map.set('poll_options', randomKey())
+  map.set('poll_multi', randomKey())
   return map
 }
 
@@ -218,12 +222,22 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    // Require either text or attachment
+    // Validate depending on mode
     const hasFile = !!(fileRef.current?.files && fileRef.current.files[0])
-    if (!hasFile && !text.trim()) {
-      setErrorTip('Добавь текст или вложение')
-      setTimeout(() => setErrorTip(''), 2000)
-      return
+    if (composeKind === 'post') {
+      if (!hasFile && !text.trim()) {
+        setErrorTip('Добавь текст или вложение')
+        setTimeout(() => setErrorTip(''), 2000)
+        return
+      }
+    } else {
+      const q = pollQuestion.trim()
+      const opts = pollOptions.map(o => o.trim()).filter(Boolean)
+      if (!q) { setErrorTip('Добавь вопрос для опроса'); setTimeout(() => setErrorTip(''), 2000); return }
+      if (q.length > 255) { setErrorTip('Вопрос длиннее 255 символов'); setTimeout(() => setErrorTip(''), 2000); return }
+      if (opts.length < 2) { setErrorTip('Минимум 2 варианта ответа'); setTimeout(() => setErrorTip(''), 2000); return }
+      if (opts.length > 10) { setErrorTip('Максимум 10 вариантов'); setTimeout(() => setErrorTip(''), 2000); return }
+      if (opts.some(o => o.length > 100)) { setErrorTip('Вариант > 100 символов'); setTimeout(() => setErrorTip(''), 2000); return }
     }
     if (hpRef.current?.value) {
       setError('Ошибка валидации')
@@ -253,7 +267,19 @@ export default function App() {
         fd.set('cf-turnstile-response', tokenToSend)
       }
       if (replyInput.trim()) fd.set('reply_to', replyInput.trim())
-      if (fileRef.current?.files?.[0]) fd.set(fields.get('file')!, fileRef.current.files[0])
+      if (composeKind === 'post') {
+        if (fileRef.current?.files?.[0]) fd.set(fields.get('file')!, fileRef.current.files[0])
+      } else {
+        const q = pollQuestion.trim().slice(0,255)
+        const opts = pollOptions.map(o => o.trim()).filter(Boolean).slice(0,10).map(o => o.slice(0,100))
+        fd.set(fields.get('poll_question')!, q)
+        fd.set(fields.get('poll_options')!, JSON.stringify(opts))
+        fd.set(fields.get('poll_multi')!, pollMulti ? '1' : '0')
+        // Plain fallbacks
+        fd.set('poll_question', q)
+        fd.set('poll_options', JSON.stringify(opts))
+        fd.set('poll_multi', pollMulti ? '1' : '0')
+      }
 
       // Wrap fields map (light obfuscation)
       fd.set('m', btoa(JSON.stringify(Object.fromEntries(fields))))
@@ -283,6 +309,10 @@ export default function App() {
           setErrorTip('Сообщение для ответа не найдено')
           setTimeout(() => setErrorTip(''), 2000)
         }
+        if (j?.error === 'moderation_blocked') {
+          setErrorTip('Пост не прошел модерацию')
+          setTimeout(() => setErrorTip(''), 2200)
+        }
         if (!j) {
           setErrorTip('Ошибка, попробуй позже')
           setTimeout(() => setErrorTip(''), 2000)
@@ -301,6 +331,12 @@ export default function App() {
       } catch {}
       if (fileRef.current) fileRef.current.value = ''
       setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
+      if (composeKind === 'poll') {
+        setComposeKind('post')
+        setPollQuestion('')
+        setPollOptions(['', ''])
+        setPollMulti(false)
+      }
       setState('done')
       setSendState('success')
       // After the checkmark, start background captcha refresh and cooldown
@@ -365,6 +401,53 @@ export default function App() {
   const [replyOpen, setReplyOpen] = useState(true)
   const [sendState, setSendState] = useState<'idle'|'sending'|'success'>('idle')
   const [errorTip, setErrorTip] = useState('')
+
+  // Attachment menu + poll mode
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const attachBtnRef = useRef<HTMLButtonElement | null>(null)
+  const [composeKind, setComposeKind] = useState<'post'|'poll'>('post')
+  // Poll state
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
+  const [pollMulti, setPollMulti] = useState(false)
+
+  const onAttachmentClick = useCallback(() => {
+    if (composeKind === 'poll') {
+      // Exit poll mode
+      setComposeKind('post')
+      setPollQuestion('')
+      setPollOptions(['', ''])
+      setPollMulti(false)
+      return
+    }
+    setShowAttachMenu(v => !v)
+  }, [composeKind])
+
+  const chooseImage = useCallback(() => {
+    setShowAttachMenu(false)
+    try { fileRef.current?.click() } catch {}
+  }, [])
+
+  const choosePoll = useCallback(() => {
+    // Enter poll mode; clear file preview if any
+    try { if (fileRef.current) fileRef.current.value = '' } catch {}
+    setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
+    setComposeKind('poll')
+    setShowAttachMenu(false)
+  }, [])
+
+  React.useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null
+      if (!target) return
+      if (attachBtnRef.current && attachBtnRef.current.contains(target)) return
+      const menu = document.getElementById('attach-menu')
+      if (menu && menu.contains(target)) return
+      setShowAttachMenu(false)
+    }
+    document.addEventListener('click', onDocClick)
+    return () => document.removeEventListener('click', onDocClick)
+  }, [])
 
   const onPickFile = useCallback(() => fileRef.current?.click(), [])
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -521,29 +604,31 @@ export default function App() {
         <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
         <form onSubmit={handleSubmit} style={composerInner}>
           <div style={composerBoxBase}>
-            <button type="button" onClick={onPickFile} title="Вложение" style={iconBtnPlain}>
-              <Paperclip size={22} />
+            <button ref={attachBtnRef} type="button" onClick={onAttachmentClick} title={composeKind==='poll' ? 'Отменить опрос' : 'Вложение'} style={iconBtnPlain}>
+              {composeKind==='poll' ? <ListChecks size={22} /> : <Paperclip size={22} />}
             </button>
             <div
               className="composer-editable"
               ref={taRef as any}
-              contentEditable
+              {...(composeKind === 'post' ? { contentEditable: true } : {})}
               role="textbox"
               aria-multiline="true"
-              data-placeholder="Поделись тем, что важно"
+              data-placeholder={composeKind==='post' ? 'Поделись тем, что важно' : ''}
               onTouchMoveCapture={(e)=>{ e.stopPropagation() }}
               onInput={(e)=>{
-                const v = (e.currentTarget as HTMLDivElement).innerText
-                setText(v)
+                if (composeKind === 'post') {
+                  const v = (e.currentTarget as HTMLDivElement).innerText
+                  setText(v)
+                }
               }}
               style={{
                 flex: 1,
-                minHeight: 24,
-                maxHeight: 140,
+                minHeight: composeKind==='post' ? 24 : undefined,
+                maxHeight: composeKind==='post' ? 140 : undefined,
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
                 lineHeight: '20px',
-                padding: '10px 14px',
+                padding: composeKind==='post' ? '10px 14px' : 0,
                 outline: 'none',
                 background: 'transparent',
                 color: 'var(--text)',
@@ -552,7 +637,61 @@ export default function App() {
                 overflowWrap: 'anywhere',
                 touchAction: 'pan-y'
               }}
-            />
+            >
+              {composeKind === 'poll' && (
+                <div style={{ width: '100%', padding: '8px 4px 8px 6px' }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <input
+                      value={pollQuestion}
+                      onChange={e=> setPollQuestion(e.target.value.slice(0,255))}
+                      placeholder="Вопрос опроса"
+                      style={{ width:'100%', padding:'10px 12px', borderRadius: 16, border:'none', background:'#0f0f14', color:'var(--text)', outline:'none', boxShadow:'0 0 0 1px rgba(255,255,255,0.06) inset' }}
+                    />
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
+                    {pollOptions.map((opt, idx) => (
+                      <div key={idx} style={{ display:'flex', alignItems:'center', gap: 8 }}>
+                        <input
+                          value={opt}
+                          onChange={e => {
+                            const v = e.target.value.slice(0,100)
+                            setPollOptions(arr => arr.map((x,i)=> i===idx? v : x))
+                          }}
+                          placeholder={`Вариант ${idx+1}`}
+                          style={{ flex:1, padding:'10px 12px', borderRadius: 16, border:'none', background:'#0f0f14', color:'var(--text)', outline:'none', boxShadow:'0 0 0 1px rgba(255,255,255,0.06) inset' }}
+                        />
+                        <button type="button" onClick={() => {
+                          setPollOptions(arr => {
+                            if (arr.length <= 2) return arr
+                            const n = arr.slice(); n.splice(idx,1); return n
+                          })
+                        }}
+                          title="Удалить вариант"
+                          disabled={pollOptions.length <= 2}
+                          style={{ width: 36, height: 36, borderRadius: 10, border:'1px solid var(--border)', background:'transparent', color: pollOptions.length<=2? 'var(--muted)' : 'var(--danger)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                    {pollOptions.length < 10 && (
+                      <button type="button" onClick={()=> setPollOptions(arr => [...arr, ''])} style={{ alignSelf:'flex-start', display:'inline-flex', gap:8, alignItems:'center', padding:'8px 12px', borderRadius: 14, border:'1px solid var(--border)', background:'transparent', color:'var(--accent)', cursor:'pointer' }}>
+                        <Plus size={18} /> Добавить вариант
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display:'flex', gap: 12, alignItems:'center', marginTop: 10 }}>
+                    <label style={{ display:'inline-flex', gap: 10, alignItems:'center', cursor:'pointer', userSelect:'none' }}>
+                      <input type="checkbox" checked={pollMulti} onChange={e=> setPollMulti(e.target.checked)} style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }} />
+                      <span style={{ width: 44, height: 26, borderRadius: 999, background: pollMulti? 'var(--accent)' : 'rgba(255,255,255,0.12)', position:'relative', transition: 'background .15s' }}>
+                        <span style={{ position:'absolute', top: 3, left: pollMulti? 22 : 3, width: 20, height: 20, background:'#fff', borderRadius: 999, transition: 'left .15s' }} />
+                      </span>
+                      <span style={{ color:'var(--muted)' }}>Мультивыбор</span>
+                    </label>
+                    <span style={{ color:'var(--muted)', fontSize: 12 }}>Опрос публикуется анонимно</span>
+                  </div>
+                </div>
+              )}
+            </div>
             <button aria-label="Отправить" disabled={state==='submitting' || isCaptchaRefreshing || isCooldown} type="submit" style={iconBtnPlain}>
               {state==='submitting' ? (
                 <span style={{ width: 16, height: 16, border: '2px solid var(--accent)', borderRightColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -575,6 +714,16 @@ export default function App() {
           )}
           {statusTip && (
             <div style={{ position:'absolute', right: 14, bottom: 58, zIndex: 45, background: 'rgba(255,255,255,0.10)', color:'var(--muted)', padding:'6px 10px', borderRadius: 8, fontSize: 12, boxShadow:'0 6px 16px rgba(0,0,0,0.20)' }}>{statusTip}</div>
+          )}
+          {showAttachMenu && composeKind==='post' && (
+            <div id="attach-menu" style={{ position:'absolute', left: 14, bottom: 58, zIndex: 48, background: '#15151b', color:'var(--text)', padding:'6px', borderRadius: 12, boxShadow:'0 10px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
+              <button type="button" onClick={chooseImage} style={{ display:'flex', alignItems:'center', gap: 10, padding:'8px 10px', width: 180, border:'none', background:'transparent', color:'inherit', cursor:'pointer', borderRadius: 8 }}>
+                <ImageIcon size={18} /> <span>Изображение</span>
+              </button>
+              <button type="button" onClick={choosePoll} style={{ display:'flex', alignItems:'center', gap: 10, padding:'8px 10px', width: 180, border:'none', background:'transparent', color:'inherit', cursor:'pointer', borderRadius: 8 }}>
+                <ListChecks size={18} /> <span>Опрос</span>
+              </button>
+            </div>
           )}
         </form>
       </div>

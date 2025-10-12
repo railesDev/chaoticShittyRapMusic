@@ -233,6 +233,11 @@ const handler: Handler = async (event) => {
   const replyToMessageId = replyMatch ? parseInt(replyMatch[1], 10) : undefined
   const honeypot = getField('honeypot')
 
+  // Poll fields (optional)
+  const pollQuestionRaw = (getField('poll_question') as string | undefined) || undefined
+  const pollOptionsRaw = (getField('poll_options') as string | undefined) || undefined
+  const pollMultiRaw = (getField('poll_multi') as string | undefined) || undefined
+
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
   if (DEBUG) {
     const keys = new Set<string>()
@@ -279,6 +284,65 @@ const handler: Handler = async (event) => {
     if (parsed && typeof parsed === 'object') {
       const direct = (parsed as any)['text']
       if (typeof direct === 'string' && direct.trim()) text = direct.trim()
+    }
+  }
+
+  // If poll is present, handle poll flow (no files)
+  if ((pollQuestionRaw && pollQuestionRaw.trim()) || (pollOptionsRaw && pollOptionsRaw.trim())) {
+    const question = (pollQuestionRaw || '').trim()
+    let options: string[] = []
+    if (pollOptionsRaw) {
+      try {
+        const arr = JSON.parse(pollOptionsRaw)
+        if (Array.isArray(arr)) options = arr.map(x => String(x || '')).map(s => s.trim()).filter(Boolean)
+      } catch {
+        // Fallback: split by newlines
+        options = pollOptionsRaw.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+      }
+    }
+    const allowsMultiple = (pollMultiRaw === '1' || /^true$/i.test(pollMultiRaw || ''))
+
+    // Validate constraints
+    if (!question) return { statusCode: 400, body: 'Нужно указать вопрос опроса' }
+    if (question.length > 255) return { statusCode: 400, body: 'Вопрос длиннее 255 символов' }
+    if (options.length < 2) return { statusCode: 400, body: 'Минимум 2 варианта ответа' }
+    if (options.length > 10) return { statusCode: 400, body: 'Максимум 10 вариантов' }
+    if (options.some(o => o.length > 100)) return { statusCode: 400, body: 'Вариант > 100 символов' }
+
+    // Moderation: question + options
+    const modInput = [question, ...options].join('\n')
+    const moderation = await aiModerate(modInput)
+    const isFlagged = !!moderation.flagged
+    if (isFlagged) {
+      return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'moderation_blocked' }) }
+    }
+
+    try {
+      const fd = new FormData()
+      fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+      fd.append('question', sanitize(question))
+      fd.append('options', JSON.stringify(options))
+      fd.append('is_anonymous', 'true')
+      if (allowsMultiple) fd.append('allows_multiple_answers', 'true')
+      if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
+      await tgApi('sendPoll', fd)
+    } catch (e: any) {
+      const msg = String(e?.message || '')
+      if (/reply message not found/i.test(msg) || /REPLY_MESSAGE_NOT_FOUND/i.test(msg)) {
+        return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'reply_not_found' }) }
+      }
+      return { statusCode: 502, body: `Telegram error: ${msg || 'unknown'}` }
+    }
+
+    const ts = Math.floor(Date.now() / 1000)
+    const tokenNew = sign(ts)
+    return {
+      statusCode: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'set-cookie': `sub_token=${tokenNew}; Max-Age=${365*24*60*60}; Path=/; HttpOnly; SameSite=Lax`
+      },
+      body: JSON.stringify({ ok: true })
     }
   }
 
