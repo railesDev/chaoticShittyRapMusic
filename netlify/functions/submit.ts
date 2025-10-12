@@ -258,14 +258,12 @@ const handler: Handler = async (event) => {
 
   const captcha = await verifyCaptcha(token)
   if (!captcha.ok) {
-    if (DEBUG) {
-      return {
-        statusCode: 400,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ error: 'captcha_failed', mode: CAPTCHA_MODE, debug: captcha })
-      }
+    // Always return JSON so frontend can reliably show a proper tip
+    return {
+      statusCode: 400,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ error: 'captcha_failed', mode: CAPTCHA_MODE, debug: DEBUG ? captcha : undefined })
     }
-    return { statusCode: 400, body: 'Captcha failed' }
   }
 
   const cookie = event.headers.cookie || ''
