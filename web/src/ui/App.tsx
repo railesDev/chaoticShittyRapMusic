@@ -679,15 +679,15 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  <div style={{ display:'flex', gap: 12, alignItems:'center', marginTop: 10 }}>
+                  <div style={{ marginTop: 10 }}>
                     <label style={{ display:'inline-flex', gap: 10, alignItems:'center', cursor:'pointer', userSelect:'none' }}>
                       <input type="checkbox" checked={pollMulti} onChange={e=> setPollMulti(e.target.checked)} style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }} />
-                      <span style={{ width: 44, height: 26, borderRadius: 999, background: pollMulti? 'var(--accent)' : 'rgba(255,255,255,0.12)', position:'relative', transition: 'background .15s' }}>
-                        <span style={{ position:'absolute', top: 3, left: pollMulti? 22 : 3, width: 20, height: 20, background:'#fff', borderRadius: 999, transition: 'left .15s' }} />
+                      <span style={{ width: 44, height: 26, borderRadius: 999, background: pollMulti? 'var(--accent)' : 'rgba(255,255,255,0.12)', position:'relative', transition: 'background .15s', overflow:'hidden', flex: '0 0 auto' }}>
+                        <span style={{ position:'absolute', top: 3, left: pollMulti? 21 : 3, width: 20, height: 20, background:'#fff', borderRadius: 999, transition: 'left .15s' }} />
                       </span>
-                      <span style={{ color:'var(--muted)' }}>Мультивыбор</span>
+                      <span style={{ color:'var(--muted)', whiteSpace:'nowrap' }}>Мультивыбор</span>
                     </label>
-                    <span style={{ color:'var(--muted)', fontSize: 12 }}>Опрос публикуется анонимно</span>
+                    <div style={{ color:'var(--muted)', fontSize: 12, opacity: .8, marginTop: 6 }}>Опрос публикуется анонимно</div>
                   </div>
                 </div>
               )}
