@@ -8,7 +8,7 @@ import OpenAI from 'openai'
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
 // Test mode routing: when enabled, post to TEST_CHANNEL; otherwise use TELEGRAM_CHANNEL_ID
-const FORCE_TEST_MODE = true // enable test mode per request
+const FORCE_TEST_MODE = false // prod mode enabled
 const TEST_MODE = FORCE_TEST_MODE || process.env.TEST_MODE === '1' || /^true$/i.test(process.env.TEST_MODE || '')
 const TEST_CHANNEL = process.env.TEST_CHANNEL || process.env.TEST_CHANNEL_ID || ''
 const TARGET_CHANNEL_ID = TEST_MODE ? (TEST_CHANNEL || TELEGRAM_CHANNEL_ID) : TELEGRAM_CHANNEL_ID
