@@ -7,6 +7,11 @@ import OpenAI from 'openai'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || ''
+// Test mode routing: when enabled, post to TEST_CHANNEL; otherwise use TELEGRAM_CHANNEL_ID
+const FORCE_TEST_MODE = true // enable test mode per request
+const TEST_MODE = FORCE_TEST_MODE || process.env.TEST_MODE === '1' || /^true$/i.test(process.env.TEST_MODE || '')
+const TEST_CHANNEL = process.env.TEST_CHANNEL || process.env.TEST_CHANNEL_ID || ''
+const TARGET_CHANNEL_ID = TEST_MODE ? (TEST_CHANNEL || TELEGRAM_CHANNEL_ID) : TELEGRAM_CHANNEL_ID
 const SIGNING_SECRET = process.env.SIGNING_SECRET || ''
 const CAPTCHA_MODE = (process.env.CAPTCHA_MODE || 'turnstile').toLowerCase()
 const DEBUG = process.env.DEBUG === '1'
@@ -163,7 +168,7 @@ async function editCaption(chatId: string, messageId: number, caption: string) {
 
 async function getChatInfo(): Promise<any> {
   const fd = new FormData()
-  fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+  fd.append('chat_id', TARGET_CHANNEL_ID)
   return tgApi('getChat', fd)
 }
 
@@ -318,7 +323,7 @@ const handler: Handler = async (event) => {
 
     try {
       const fd = new FormData()
-      fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+  fd.append('chat_id', TARGET_CHANNEL_ID)
       const questionFinal = isFlagged ? `⚠️ ${question}` : question
       fd.append('question', sanitize(questionFinal))
       fd.append('options', JSON.stringify(options))
@@ -347,7 +352,10 @@ const handler: Handler = async (event) => {
   }
 
   // Handle file (single optional)
-  const file = (parsed.files || [])[0]
+  const files = (parsed.files || []) as Array<{ filename?: string; contentType?: string; content?: Buffer }>
+  const mediaFiles = files.filter(f => (f.contentType || '').startsWith('image/') || (f.contentType || '').startsWith('video/'))
+  const docFiles = files.filter(f => !!f.content && !!f.contentType && !(f.contentType || '').startsWith('image/') && !(f.contentType || '').startsWith('video/'))
+  const file = files[0]
   let content: Buffer | undefined
   let filename: string | undefined
   let mime: string | undefined
@@ -370,10 +378,7 @@ const handler: Handler = async (event) => {
     if (mime && blocked.some(p => mime.startsWith(p))) {
       return { statusCode: 400, body: 'Этот тип файлов запрещён' }
     }
-    // Drop video support explicitly
-    if (mime && mime.startsWith('video/')) {
-      return { statusCode: 400, body: 'Видео не поддерживается' }
-    }
+    // allow video files (album or single)
   }
 
   const captionBase = sanitize(text)
@@ -385,10 +390,33 @@ const handler: Handler = async (event) => {
   const isFlagged = !!moderation.flagged
 
   try {
-    if (content) {
+    // Media album (photo/video up to 10). Only when multiple media files and no docs.
+    if (mediaFiles.length > 1 && docFiles.length === 0) {
+      const list = mediaFiles.slice(0, 10)
+      const fd = new FormData()
+      fd.append('chat_id', TARGET_CHANNEL_ID)
+      const media: any[] = []
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i]
+        const kind = (f.contentType || '').startsWith('video/') ? 'video' : 'photo'
+        const field = `file${i}`
+        media.push({ type: kind, media: `attach://${field}`, ...(i === 0 && captionBase ? { caption: captionBase, parse_mode: 'HTML' } : {}), ...(isFlagged ? { has_spoiler: true } : {}) })
+        fd.append(field, new Blob([f.content as Buffer], { type: f.contentType || 'application/octet-stream' }), f.filename || field)
+      }
+      fd.append('media', JSON.stringify(media))
+      const sent = await tgApi('sendMediaGroup', fd)
+      const first = Array.isArray(sent) ? sent[0] : null
+      const id = first?.message_id as number | undefined
+      if (id) {
+        const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
+        const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
+        const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
+        await editCaption(TARGET_CHANNEL_ID, id, finalCaption)
+      }
+    } else if (content) {
       const fd = new FormData()
       if (mime?.startsWith('image/')) {
-        fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+        fd.append('chat_id', TARGET_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
@@ -399,9 +427,9 @@ const handler: Handler = async (event) => {
         const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await editCaption(TARGET_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('audio/')) {
-        fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+        fd.append('chat_id', TARGET_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
@@ -411,9 +439,9 @@ const handler: Handler = async (event) => {
         const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await editCaption(TARGET_CHANNEL_ID, id, finalCaption)
       } else if (mime?.startsWith('video/')) {
-        fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+        fd.append('chat_id', TARGET_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
@@ -423,9 +451,9 @@ const handler: Handler = async (event) => {
         const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await editCaption(TARGET_CHANNEL_ID, id, finalCaption)
       } else {
-        fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+        fd.append('chat_id', TARGET_CHANNEL_ID)
         if (captionBase) fd.append('caption', captionBase)
         fd.append('parse_mode', 'HTML')
         if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
@@ -435,11 +463,11 @@ const handler: Handler = async (event) => {
         const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
         const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
         const finalCaption = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
-        await editCaption(TELEGRAM_CHANNEL_ID, id, finalCaption)
+        await editCaption(TARGET_CHANNEL_ID, id, finalCaption)
       }
     } else {
       const fd = new FormData()
-      fd.append('chat_id', TELEGRAM_CHANNEL_ID)
+      fd.append('chat_id', TARGET_CHANNEL_ID)
       fd.append('text', captionBase || '...')
       fd.append('parse_mode', 'HTML')
       if (replyToMessageId !== undefined) { fd.append('reply_to_message_id', String(replyToMessageId)); }
@@ -448,7 +476,7 @@ const handler: Handler = async (event) => {
       const warning = isFlagged ? `\n⚠️ Пост не прошел модерацию\n` : ''
       const body = captionBase ? (isFlagged ? `<tg-spoiler>${captionBase}</tg-spoiler>` : captionBase) : ''
       const finalText = body ? `cu-${id}${warning}\n${body}` : `cu-${id}${warning}`
-      await editText(TELEGRAM_CHANNEL_ID, id, finalText)
+      await editText(TARGET_CHANNEL_ID, id, finalText)
     }
 
     // No channel description updates

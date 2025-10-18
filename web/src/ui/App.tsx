@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Paperclip, Send, Reply, Trash2, Pause, Play, Check, ListChecks, Image as ImageIcon, Plus } from 'lucide-react'
+import { Paperclip, Send, Reply, Trash2, Pause, Play, Check, ListChecks, Image as ImageIcon, Plus, Video as VideoIcon, File as FileIcon } from 'lucide-react'
 
 type SubmitState = 'idle' | 'submitting' | 'done' | 'error'
 
@@ -41,6 +41,7 @@ export default function App() {
   const [rateLimitSec, setRateLimitSec] = useState<number>(10)
   const [fields] = useState(buildFields)
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const albumRef = useRef<HTMLInputElement | null>(null)
   const hpRef = useRef<HTMLInputElement | null>(null)
   const [text, setText] = useState('')
   const taRef = useRef<HTMLTextAreaElement | null>(null)
@@ -225,7 +226,8 @@ export default function App() {
     // Validate depending on mode
     const hasFile = !!(fileRef.current?.files && fileRef.current.files[0])
     if (composeKind === 'post') {
-      if (!hasFile && !text.trim()) {
+      const hasAlbum = album.length > 0
+      if (!hasAlbum && !hasFile && !text.trim()) {
         setErrorTip('Добавь текст или вложение')
         setTimeout(() => setErrorTip(''), 2000)
         return
@@ -268,7 +270,14 @@ export default function App() {
       }
       if (replyInput.trim()) fd.set('reply_to', replyInput.trim())
       if (composeKind === 'post') {
-        if (fileRef.current?.files?.[0]) fd.set(fields.get('file')!, fileRef.current.files[0])
+        if (album.length > 0) {
+          // append up to 10 media files
+          album.slice(0,10).forEach((it, i) => {
+            fd.append(`file${i}`, it.file)
+          })
+        } else if (fileRef.current?.files?.[0]) {
+          fd.set(fields.get('file')!, fileRef.current.files[0])
+        }
       } else {
         const q = pollQuestion.trim().slice(0,255)
         const opts = pollOptions.map(o => o.trim()).filter(Boolean).slice(0,10).map(o => o.slice(0,100))
@@ -329,6 +338,7 @@ export default function App() {
       } catch {}
       if (fileRef.current) fileRef.current.value = ''
       setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
+      setAlbum([])
       if (composeKind === 'poll') {
         setComposeKind('post')
         setPollQuestion('')
@@ -400,6 +410,7 @@ export default function App() {
   const [replyOpen, setReplyOpen] = useState(true)
   const [sendState, setSendState] = useState<'idle'|'sending'|'success'>('idle')
   const [errorTip, setErrorTip] = useState('')
+  const [album, setAlbum] = useState<Array<{ url: string|null; kind: 'image'|'video'; file: File }>>([])
 
   // Attachment menu + poll mode
   const [showAttachMenu, setShowAttachMenu] = useState(false)
@@ -422,15 +433,16 @@ export default function App() {
     setShowAttachMenu(v => !v)
   }, [composeKind])
 
-  const chooseImage = useCallback(() => {
+  const chooseAttachment = useCallback(() => {
     setShowAttachMenu(false)
-    try { fileRef.current?.click() } catch {}
+    try { albumRef.current?.click() } catch {}
   }, [])
 
   const choosePoll = useCallback(() => {
     // Enter poll mode; clear file preview if any
     try { if (fileRef.current) fileRef.current.value = '' } catch {}
     setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
+    setAlbum([])
     setComposeKind('poll')
     setShowAttachMenu(false)
   }, [])
@@ -449,10 +461,22 @@ export default function App() {
   }, [])
 
   const onPickFile = useCallback(() => fileRef.current?.click(), [])
+  const onPickAlbum = useCallback(() => albumRef.current?.click(), [])
+  const onAlbumChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const media = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/')).slice(0, 10)
+    if (media.length === 0) { setAlbum([]); return }
+    const next: Array<{url:string|null;kind:'image'|'video';file:File}> = media.map(f => ({ url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null, kind: f.type.startsWith('video/') ? 'video' : 'image', file: f }))
+    setAlbum(next)
+    // Clear doc file selection if any
+    if (fileRef.current) fileRef.current.value = ''
+    // Reset single preview states
+    setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
+  }, [])
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) { setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null); return }
-    if (f.type.startsWith('video/')) { alert('Видео не поддерживается'); if (fileRef.current) fileRef.current.value=''; return }
+    if (f.type.startsWith('image/') || f.type.startsWith('video/')) { setErrorTip('Фото и видео через «Вложение»'); setTimeout(()=>setErrorTip(''), 2000); if (fileRef.current) fileRef.current.value=''; return }
     const url = URL.createObjectURL(f)
     setPreviewUrl(url)
     if (f.type.startsWith('image/')) setPreviewKind('image')
@@ -466,6 +490,10 @@ export default function App() {
     if (fileRef.current) fileRef.current.value = ''
     setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null); setAudioPlaying(false); setAudioTime(0)
   }, [])
+  const removeAlbumAt = useCallback((idx: number) => {
+    setAlbum(list => list.filter((_,i)=> i!==idx))
+  }, [])
+  const clearAlbum = useCallback(() => { setAlbum([]) }, [])
 
   React.useEffect(() => {
     const m = replyInput.match(/(?:cu[-: ]?)?(\d+)/i)
@@ -545,6 +573,33 @@ export default function App() {
           {replyInput && (
             <div style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
               <div style={{ color: 'var(--muted)', whiteSpace: 'pre-wrap', fontSize: 16, lineHeight: 1.4 }}>{replyPreview ? replyPreview.slice(0,200) : 'Сообщение не найдено'}</div>
+            </div>
+          )}
+          {album.length > 0 && (
+            <div>
+              <div style={{ position:'relative', border: '1px solid var(--border)', background: '#0f0f14', borderRadius: 20, padding: 8 }}>
+                <div style={{ display:'grid', gridTemplateColumns: album.length > 3 ? 'repeat(3, 1fr)' : (album.length===1 ? '1fr' : 'repeat(2, 1fr)'), gap: 8 }}>
+                  {album.map((it, idx) => (
+                    <div key={idx} style={{ position:'relative', borderRadius: 14, overflow:'hidden', minHeight: 100, background:'#0d0d12', border:'1px solid var(--border)' }}>
+                      {it.kind === 'image' && it.url && (
+                        <img src={it.url} alt={`media-${idx}`} style={{ width:'100%', height: '100%', objectFit:'cover', display:'block' }} />
+                      )}
+                      {it.kind === 'video' && (
+                        <div style={{ width:'100%', paddingTop:'62%', background:'#0d0d12' }} />
+                      )}
+                      <div style={{ position:'absolute', left: 6, top: 6, width: 22, height: 22, borderRadius: 8, background:'rgba(0,0,0,0.55)', color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center', border:'1px solid var(--border)' }}>
+                        {it.kind === 'video' ? <VideoIcon size={14}/> : <ImageIcon size={14}/>}
+                      </div>
+                      <button type="button" onClick={()=>removeAlbumAt(idx)} title="Удалить" style={{ position:'absolute', right: 6, top: 6, width: 28, height: 28, borderRadius: 8, background:'rgba(0,0,0,0.55)', color:'var(--danger)', border:'1px solid var(--border)', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', justifyContent:'flex-end', marginTop: 8 }}>
+                  <button type="button" onClick={clearAlbum} style={{ color:'var(--danger)', background:'transparent', border:'1px solid var(--border)', borderRadius: 10, padding:'6px 10px' }}>Очистить</button>
+                </div>
+              </div>
             </div>
           )}
           {previewUrl && (
@@ -704,6 +759,7 @@ export default function App() {
             </button>
           </div>
           
+          <input ref={albumRef} onChange={onAlbumChange} type="file" name="album" accept="image/*,video/*" multiple style={{ display: 'none' }} />
           <input ref={fileRef} onChange={onFileChange} type="file" name="file" style={{ display: 'none' }} />
           {captchaMode !== 'none' && <div id="cf-turnstile" data-sitekey={siteKey || ''} style={{ display: 'none' }}></div>}
           <input ref={hpRef} type="text" name="company" autoComplete="off" style={{ display: 'none' }} />
@@ -716,8 +772,11 @@ export default function App() {
           )}
           {showAttachMenu && composeKind==='post' && (
             <div id="attach-menu" style={{ position:'absolute', left: 14, bottom: 58, zIndex: 48, background: '#15151b', color:'var(--text)', padding:'6px', borderRadius: 12, boxShadow:'0 10px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
-              <button type="button" onClick={chooseImage} style={{ display:'flex', alignItems:'center', gap: 10, padding:'8px 10px', width: 180, border:'none', background:'transparent', color:'inherit', cursor:'pointer', borderRadius: 8 }}>
-                <ImageIcon size={18} /> <span>Изображение</span>
+              <button type="button" onClick={chooseAttachment} style={{ display:'flex', alignItems:'center', gap: 10, padding:'8px 10px', width: 180, border:'none', background:'transparent', color:'inherit', cursor:'pointer', borderRadius: 8 }}>
+                <Paperclip size={18} /> <span>Вложение</span>
+              </button>
+              <button type="button" onClick={onPickFile} style={{ display:'flex', alignItems:'center', gap: 10, padding:'8px 10px', width: 180, border:'none', background:'transparent', color:'inherit', cursor:'pointer', borderRadius: 8 }}>
+                <FileIcon size={18} /> <span>Файл</span>
               </button>
               <button type="button" onClick={choosePoll} style={{ display:'flex', alignItems:'center', gap: 10, padding:'8px 10px', width: 180, border:'none', background:'transparent', color:'inherit', cursor:'pointer', borderRadius: 8 }}>
                 <ListChecks size={18} /> <span>Опрос</span>
