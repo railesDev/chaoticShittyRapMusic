@@ -325,22 +325,22 @@ export default function App() {
           setTimeout(() => setErrorTip(''), 2000)
         }
         if (j?.error === 'mixed_media_doc') {
-          setErrorTip('Нельзя вместе файл и медиа — очисти выбор')
+          setErrorTip('Нельзя вместе файл и медиа - очисти выбор')
           setTimeout(() => setErrorTip(''), 2500)
         }
         if (j?.error === 'file_too_big') {
           const mb = j?.limit_mb || maxFileMb
-          setErrorTip(`Слишком большой файл (макс ${mb}MB) — прикрепи ссылку`)
+          setErrorTip(`Слишком большой файл (макс ${mb}MB) - прикрепи ссылку`)
           setTimeout(() => setErrorTip(''), 2600)
         }
         if (j?.error === 'total_too_big') {
           const mb = j?.limit_mb || maxFileMb
-          setErrorTip(`Суммарный размер вложений слишком большой (>${mb}MB) — прикрепи ссылку`)
+          setErrorTip(`Суммарный размер вложений слишком большой (>${mb}MB) - прикрепи ссылку`)
           setTimeout(() => setErrorTip(''), 2600)
         }
         if (j?.error === 'video_too_long') {
           const s = j?.limit_sec || videoMaxSec
-          setErrorTip(`Видео длиннее ${s} сек — прикрепи ссылку`)
+          setErrorTip(`Видео длиннее ${s} сек - прикрепи ссылку`)
           setTimeout(() => setErrorTip(''), 2600)
         }
         if (!j) {
@@ -499,20 +499,19 @@ export default function App() {
   const onPickAlbum = useCallback(() => albumRef.current?.click(), [])
   const onAlbumChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    const media = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/')).slice(0, 10)
-    if (media.length === 0) { setAlbum([]); return }
+    const media = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
+    if (media.length === 0) return
     const perMax = (maxFileMb || 6) * 1024 * 1024
     let tooBig = false
     const filtered = media.filter(f => {
       if (f.size > perMax) { tooBig = true; return false }
       return true
     })
-    if (tooBig) { setErrorTip('Слишком большой файл — прикрепи ссылку'); setTimeout(()=>setErrorTip(''), 2200) }
+    if (tooBig) { setErrorTip('Слишком большой файл - прикрепи ссылку'); setTimeout(()=>setErrorTip(''), 2200) }
 
     // Build initial list and then enrich video items with duration + thumbnail
     const base = filtered.map(f => ({ url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null, kind: f.type.startsWith('video/') ? 'video' : 'image' as const, file: f, thumb: null as string|null, duration: undefined as number|undefined }))
 
-    // Helper to load video metadata
     const loadVideoMeta = (file: File) => new Promise<{duration:number;thumb:string|null}>(resolve => {
       const v = document.createElement('video')
       v.preload = 'metadata'
@@ -520,7 +519,6 @@ export default function App() {
       v.src = URL.createObjectURL(file)
       v.onloadedmetadata = () => {
         const d = Number(v.duration) || 0
-        // Try capture frame at 0.5s
         const capture = () => {
           try {
             const canvas = document.createElement('canvas')
@@ -535,7 +533,6 @@ export default function App() {
         }
         try { v.currentTime = Math.min(0.5, d || 0) } catch {}
         v.onseeked = capture
-        // Fallback if seek doesn't fire
         setTimeout(capture, 400)
       }
       v.onerror = () => resolve({ duration: 0, thumb: null })
@@ -553,9 +550,18 @@ export default function App() {
         }
         return item
       }))
-      const finalList = enriched.filter(Boolean) as typeof base
-      if (longFound) { setErrorTip(`Видео длиннее ${videoMaxSec} сек — прикрепи ссылку`); setTimeout(()=>setErrorTip(''), 2600) }
-      setAlbum(finalList)
+      const addList = enriched.filter(Boolean) as typeof base
+      if (addList.length === 0) {
+        if (longFound) { setErrorTip(`Видео длиннее ${videoMaxSec} сек - прикрепи ссылку`); setTimeout(()=>setErrorTip(''), 2600) }
+        return
+      }
+      setAlbum(prev => {
+        const remain = Math.max(0, 10 - prev.length)
+        if (remain <= 0) { setErrorTip('Вложений максимум 10'); setTimeout(()=>setErrorTip(''), 2200); return prev }
+        const toAdd = addList.slice(0, remain)
+        if (addList.length > remain) { setErrorTip('Вложений максимум 10'); setTimeout(()=>setErrorTip(''), 2200) }
+        return [...prev, ...toAdd]
+      })
     })()
 
     // Clear doc file selection if any
