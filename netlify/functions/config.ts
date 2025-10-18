@@ -4,6 +4,9 @@ import crypto from 'node:crypto'
 const RATE_LIMIT_MINUTES = parseInt(process.env.RATE_LIMIT_MINUTES || '1', 10)
 const RATE_LIMIT_SECONDS_ENV = parseInt(process.env.RATE_LIMIT_SECONDS || '10', 10)
 const RATE_WINDOW_SECONDS = Number.isFinite(RATE_LIMIT_SECONDS_ENV) ? RATE_LIMIT_SECONDS_ENV : (RATE_LIMIT_MINUTES * 60)
+const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6', 10)
+const VIDEO_MAX_SECONDS = parseInt(process.env.VIDEO_MAX_SECONDS || '180', 10)
+const MAX_TOTAL_UPLOAD_MB = parseInt(process.env.MAX_TOTAL_UPLOAD_MB || String(MAX_ATTACHMENT_SIZE_MB), 10)
 const SIGNING_SECRET = process.env.SIGNING_SECRET || ''
 
 function b64e(buf: Buffer) {
@@ -32,7 +35,10 @@ const handler: Handler = async () => {
     body: JSON.stringify({
       captcha: mode,
       turnstile_site_key: process.env.TURNSTILE_SITE_KEY || '',
-      rate_limit_seconds: RATE_WINDOW_SECONDS
+      rate_limit_seconds: RATE_WINDOW_SECONDS,
+      max_attachment_mb: MAX_ATTACHMENT_SIZE_MB,
+      video_max_seconds: VIDEO_MAX_SECONDS,
+      max_total_upload_mb: MAX_TOTAL_UPLOAD_MB
     })
   }
 }

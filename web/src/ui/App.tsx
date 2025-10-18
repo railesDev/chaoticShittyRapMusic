@@ -21,6 +21,7 @@ function buildFields() {
   map.set('poll_question', randomKey())
   map.set('poll_options', randomKey())
   map.set('poll_multi', randomKey())
+  map.set('media_meta', randomKey())
   return map
 }
 
@@ -146,6 +147,8 @@ export default function App() {
             }
           }
           if (Number.isFinite(j?.rate_limit_seconds)) setRateLimitSec(parseInt(j.rate_limit_seconds, 10))
+          if (Number.isFinite(j?.max_attachment_mb)) setMaxFileMb(parseInt(j.max_attachment_mb, 10))
+          if (Number.isFinite(j?.video_max_seconds)) setVideoMaxSec(parseInt(j.video_max_seconds, 10))
         }
       } catch {}
     })()
@@ -271,10 +274,13 @@ export default function App() {
       if (replyInput.trim()) fd.set('reply_to', replyInput.trim())
       if (composeKind === 'post') {
         if (album.length > 0) {
-          // append up to 10 media files
+          // append up to 10 media files and meta
+          const meta = album.slice(0,10).map(it => ({ kind: it.kind, duration: it.duration || 0 }))
           album.slice(0,10).forEach((it, i) => {
             fd.append(`file${i}`, it.file)
           })
+          fd.set('media_meta', JSON.stringify(meta))
+          fd.set(fields.get('media_meta') || 'media_meta', JSON.stringify(meta))
         } else if (fileRef.current?.files?.[0]) {
           fd.set(fields.get('file')!, fileRef.current.files[0])
         }
@@ -318,7 +324,25 @@ export default function App() {
           setErrorTip('Сообщение для ответа не найдено')
           setTimeout(() => setErrorTip(''), 2000)
         }
-        // no-op: polls are now sent with a warning mark instead of blocking
+        if (j?.error === 'mixed_media_doc') {
+          setErrorTip('Нельзя вместе файл и медиа — очисти выбор')
+          setTimeout(() => setErrorTip(''), 2500)
+        }
+        if (j?.error === 'file_too_big') {
+          const mb = j?.limit_mb || maxFileMb
+          setErrorTip(`Слишком большой файл (макс ${mb}MB) — прикрепи ссылку`)
+          setTimeout(() => setErrorTip(''), 2600)
+        }
+        if (j?.error === 'total_too_big') {
+          const mb = j?.limit_mb || maxFileMb
+          setErrorTip(`Суммарный размер вложений слишком большой (>${mb}MB) — прикрепи ссылку`)
+          setTimeout(() => setErrorTip(''), 2600)
+        }
+        if (j?.error === 'video_too_long') {
+          const s = j?.limit_sec || videoMaxSec
+          setErrorTip(`Видео длиннее ${s} сек — прикрепи ссылку`)
+          setTimeout(() => setErrorTip(''), 2600)
+        }
         if (!j) {
           setErrorTip('Ошибка, попробуй позже')
           setTimeout(() => setErrorTip(''), 2000)
@@ -434,6 +458,11 @@ export default function App() {
   }, [composeKind])
 
   const chooseAttachment = useCallback(() => {
+    if (fileRef.current && fileRef.current.files && fileRef.current.files[0]) {
+      setErrorTip('Очисти выбранный файл, чтобы добавить медиа')
+      setTimeout(()=>setErrorTip(''), 2200)
+      return
+    }
     setShowAttachMenu(false)
     try { albumRef.current?.click() } catch {}
   }, [])
@@ -460,19 +489,77 @@ export default function App() {
     return () => document.removeEventListener('click', onDocClick)
   }, [])
 
-  const onPickFile = useCallback(() => fileRef.current?.click(), [])
+  const onPickFile = useCallback(() => {
+    if (album.length > 0) { setErrorTip('Очисти медиа, чтобы прикрепить файл'); setTimeout(()=>setErrorTip(''), 2200); return }
+    fileRef.current?.click()
+  }, [album])
   const onPickAlbum = useCallback(() => albumRef.current?.click(), [])
   const onAlbumChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     const media = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/')).slice(0, 10)
     if (media.length === 0) { setAlbum([]); return }
-    const next: Array<{url:string|null;kind:'image'|'video';file:File}> = media.map(f => ({ url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null, kind: f.type.startsWith('video/') ? 'video' : 'image', file: f }))
-    setAlbum(next)
+    const perMax = (maxFileMb || 6) * 1024 * 1024
+    let tooBig = false
+    const filtered = media.filter(f => {
+      if (f.size > perMax) { tooBig = true; return false }
+      return true
+    })
+    if (tooBig) { setErrorTip('Слишком большой файл — прикрепи ссылку'); setTimeout(()=>setErrorTip(''), 2200) }
+
+    // Build initial list and then enrich video items with duration + thumbnail
+    const base = filtered.map(f => ({ url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null, kind: f.type.startsWith('video/') ? 'video' : 'image' as const, file: f, thumb: null as string|null, duration: undefined as number|undefined }))
+
+    // Helper to load video metadata
+    const loadVideoMeta = (file: File) => new Promise<{duration:number;thumb:string|null}>(resolve => {
+      const v = document.createElement('video')
+      v.preload = 'metadata'
+      v.muted = true
+      v.src = URL.createObjectURL(file)
+      v.onloadedmetadata = () => {
+        const d = Number(v.duration) || 0
+        // Try capture frame at 0.5s
+        const capture = () => {
+          try {
+            const canvas = document.createElement('canvas')
+            canvas.width = 320; canvas.height = 180
+            const ctx = canvas.getContext('2d')!
+            ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+            const url = canvas.toDataURL('image/jpeg', 0.7)
+            resolve({ duration: d, thumb: url })
+          } catch {
+            resolve({ duration: d, thumb: null })
+          }
+        }
+        try { v.currentTime = Math.min(0.5, d || 0) } catch {}
+        v.onseeked = capture
+        // Fallback if seek doesn't fire
+        setTimeout(capture, 400)
+      }
+      v.onerror = () => resolve({ duration: 0, thumb: null })
+    })
+
+    ;(async () => {
+      let longFound = false
+      const enriched = await Promise.all(base.map(async (item) => {
+        if (item.kind === 'video') {
+          const meta = await loadVideoMeta(item.file)
+          const duration = meta.duration || 0
+          const thumb = meta.thumb
+          if (videoMaxSec > 0 && duration > videoMaxSec) { longFound = true; return null }
+          return { ...item, thumb, duration }
+        }
+        return item
+      }))
+      const finalList = enriched.filter(Boolean) as typeof base
+      if (longFound) { setErrorTip(`Видео длиннее ${videoMaxSec} сек — прикрепи ссылку`); setTimeout(()=>setErrorTip(''), 2600) }
+      setAlbum(finalList)
+    })()
+
     // Clear doc file selection if any
     if (fileRef.current) fileRef.current.value = ''
     // Reset single preview states
     setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null)
-  }, [])
+  }, [maxFileMb, videoMaxSec])
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) { setPreviewUrl(null); setPreviewKind(null); setAudioMeta(null); return }
@@ -585,7 +672,11 @@ export default function App() {
                         <img src={it.url} alt={`media-${idx}`} style={{ width:'100%', height: '100%', objectFit:'cover', display:'block' }} />
                       )}
                       {it.kind === 'video' && (
-                        <div style={{ width:'100%', paddingTop:'62%', background:'#0d0d12' }} />
+                        it.thumb ? (
+                          <img src={it.thumb} alt={`video-${idx}`} style={{ width:'100%', height: '100%', objectFit:'cover', display:'block' }} />
+                        ) : (
+                          <div style={{ width:'100%', paddingTop:'62%', background:'#0d0d12' }} />
+                        )
                       )}
                       <div style={{ position:'absolute', left: 6, top: 6, width: 22, height: 22, borderRadius: 8, background:'rgba(0,0,0,0.55)', color:'#fff', display:'inline-flex', alignItems:'center', justifyContent:'center', border:'1px solid var(--border)' }}>
                         {it.kind === 'video' ? <VideoIcon size={14}/> : <ImageIcon size={14}/>}

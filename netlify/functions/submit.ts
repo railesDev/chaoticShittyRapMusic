@@ -18,6 +18,8 @@ const DEBUG = process.env.DEBUG === '1'
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET || ''
 const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET || ''
 const MAX_ATTACHMENT_SIZE_MB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '6', 10)
+const MAX_TOTAL_UPLOAD_MB = parseInt(process.env.MAX_TOTAL_UPLOAD_MB || String(MAX_ATTACHMENT_SIZE_MB), 10)
+const VIDEO_MAX_SECONDS = parseInt(process.env.VIDEO_MAX_SECONDS || '180', 10)
 const OPENAI_KEY = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY || ''
 const RATE_LIMIT_MINUTES = parseInt(process.env.RATE_LIMIT_MINUTES || '1', 10)
 const RATE_LIMIT_SECONDS_ENV = parseInt(process.env.RATE_LIMIT_SECONDS || '10', 10)
@@ -244,6 +246,7 @@ const handler: Handler = async (event) => {
   const pollQuestionRaw = (getField('poll_question') as string | undefined) || undefined
   const pollOptionsRaw = (getField('poll_options') as string | undefined) || undefined
   const pollMultiRaw = (getField('poll_multi') as string | undefined) || undefined
+  const mediaMetaRaw = (getField('media_meta') as string | undefined) || undefined
 
   if (honeypot) return { statusCode: 400, body: 'Invalid form' }
   if (DEBUG) {
@@ -381,6 +384,27 @@ const handler: Handler = async (event) => {
     // allow video files (album or single)
   }
 
+  // Validate combinations and total upload size
+  if (mediaFiles.length > 0 && docFiles.length > 0) {
+    return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'mixed_media_doc' }) }
+  }
+  if (files.length > 0) {
+    const perMax = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024
+    let total = 0
+    for (const f of files) {
+      const buf = f.content as Buffer
+      if (!buf || buf.length === 0) return { statusCode: 400, body: 'Пустой файл' }
+      total += buf.length
+      if (buf.length > perMax) {
+        return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'file_too_big', limit_mb: MAX_ATTACHMENT_SIZE_MB }) }
+      }
+    }
+    const totalMax = MAX_TOTAL_UPLOAD_MB * 1024 * 1024
+    if (total > totalMax) {
+      return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'total_too_big', limit_mb: MAX_TOTAL_UPLOAD_MB }) }
+    }
+  }
+
   const captionBase = sanitize(text)
   // No storage/description counter — we only use message_id
 
@@ -396,11 +420,38 @@ const handler: Handler = async (event) => {
       const fd = new FormData()
       fd.append('chat_id', TARGET_CHANNEL_ID)
       const media: any[] = []
+      // Parse optional meta for durations
+      let meta: Array<{ kind?: string; duration?: number }> = []
+      try { if (mediaMetaRaw) meta = JSON.parse(mediaMetaRaw) } catch {}
+
+      // Moderate images individually
+      const flags: boolean[] = []
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i]
+        const isVideo = (f.contentType || '').startsWith('video/')
+        if (isVideo) {
+          const d = meta[i]?.duration || 0
+          if (VIDEO_MAX_SECONDS > 0 && d > VIDEO_MAX_SECONDS) {
+            return { statusCode: 400, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'video_too_long', limit_sec: VIDEO_MAX_SECONDS }) }
+          }
+          flags.push(false)
+        } else {
+          const buf = f.content as Buffer
+          const sig = await fileTypeFromBuffer(buf).catch(() => null)
+          const mimeLocal = sig?.mime || f.contentType || 'image/jpeg'
+          const res = await aiModerate(undefined, { mime: mimeLocal, data: buf })
+          flags.push(!!res.flagged)
+        }
+      }
+
       for (let i = 0; i < list.length; i++) {
         const f = list[i]
         const kind = (f.contentType || '').startsWith('video/') ? 'video' : 'photo'
         const field = `file${i}`
-        media.push({ type: kind, media: `attach://${field}`, ...(i === 0 && captionBase ? { caption: captionBase, parse_mode: 'HTML' } : {}), ...(isFlagged ? { has_spoiler: true } : {}) })
+        const obj: any = { type: kind, media: `attach://${field}` }
+        if (i === 0 && captionBase) { obj.caption = captionBase; obj.parse_mode = 'HTML' }
+        if (flags[i]) obj.has_spoiler = true
+        media.push(obj)
         fd.append(field, new Blob([f.content as Buffer], { type: f.contentType || 'application/octet-stream' }), f.filename || field)
       }
       fd.append('media', JSON.stringify(media))
