@@ -434,6 +434,9 @@ export default function App() {
   const [replyOpen, setReplyOpen] = useState(true)
   const [sendState, setSendState] = useState<'idle'|'sending'|'success'>('idle')
   const [errorTip, setErrorTip] = useState('')
+  // Limits from config
+  const [maxFileMb, setMaxFileMb] = useState<number>(6)
+  const [videoMaxSec, setVideoMaxSec] = useState<number>(180)
   const [album, setAlbum] = useState<Array<{ url: string|null; kind: 'image'|'video'; file: File }>>([])
 
   // Attachment menu + poll mode
